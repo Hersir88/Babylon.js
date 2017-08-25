@@ -1271,6 +1271,16 @@
                     "../../materialsLibrary/src/legacyPBR/legacyColorGradingDefinition.fx"
                 ],
                 "output": "babylon.legacyPbrMaterial.js"
+            },
+            {
+                "files": [
+                    "../../materialsLibrary/src/layerMaterial/babylon.layerMaterial.ts"
+                ],
+                "shaderFiles": [
+                    "../../materialsLibrary/src/layerMaterial/layerMaterial.vertex.fx",
+                    "../../materialsLibrary/src/layerMaterial/layerMaterial.fragment.fx"
+                ],
+                "output": "babylon.layerMaterial.js"
             }
         ],
         "build": {

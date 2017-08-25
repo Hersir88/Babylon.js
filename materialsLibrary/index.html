@@ -181,6 +181,10 @@
 				simple.diffuseTexture.uScale = 5;
 				simple.diffuseTexture.vScale = 5;
 
+				var layerMaterial = new BABYLON.LayerMaterial("layerMaterial", scene);
+				layerMaterial.diffuseTexture = new BABYLON.Texture("../assets/textures/floor.png", scene);
+				layerMaterial.backgroundColor = new BABYLON.Color3(1, 0, 1);
+
 				var normal = prepareNormal();
 
 				var gradient = prepareGradient();
@@ -220,7 +224,7 @@
 				sphere.material = std;				
 				sphere.receiveShadows = true;
 
-				gui.add(options, 'material', ['standard', 'simple', 'water', 'fire', 'lava', 'normal', 'terrain', 'pbr', 'pbrmetallicroughness', 'pbrspecularglossiness', 'legacyPbr', 'fur', 'triPlanar', 'gradient', 'sky', 'grid', 'shadowOnly', 'cell']).onFinishChange(function () {
+				gui.add(options, 'material', ['standard','layerMaterial', 'simple', 'water', 'fire', 'lava', 'normal', 'terrain', 'pbr', 'pbrmetallicroughness', 'pbrspecularglossiness', 'legacyPbr', 'fur', 'triPlanar', 'gradient', 'sky', 'grid', 'shadowOnly', 'cell']).onFinishChange(function () {
 					water.enableRenderTargets(false);
 					skybox.material = skyboxMaterial;
 					currentMesh.isVisible = true;
@@ -281,6 +285,9 @@
                             break;
 						case "cell":
 							currentMaterial = cell;
+							break;
+						case "layerMaterial":
+							currentMaterial = layerMaterial;
 							break;
 						default:
 							currentMaterial = std;
