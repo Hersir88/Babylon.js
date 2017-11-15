@@ -47,7 +47,7 @@ module BABYLON.GLTF2 {
     * Interfaces
     */
     export interface IGLTFProperty {
-        extensions?: Object;
+        extensions?: { [key: string]: any };
         extras?: any;
     }
 
@@ -82,6 +82,9 @@ module BABYLON.GLTF2 {
         max: number[];
         min: number[];
         sparse?: IGLTFAccessorSparse;
+
+        // Runtime values
+        index: number;
     }
 
     export interface IGLTFAnimationChannel extends IGLTFProperty {
@@ -105,7 +108,8 @@ module BABYLON.GLTF2 {
         samplers: IGLTFAnimationSampler[];
 
         // Runtime values
-        targets?: any[];
+        index: number;
+        targets: any[];
     }
 
     export interface IGLTFAsset extends IGLTFChildRootProperty {
@@ -120,8 +124,9 @@ module BABYLON.GLTF2 {
         byteLength: number;
 
         // Runtime values
-        loadedData: ArrayBufferView;
-        loadedObservable: Observable<IGLTFBuffer>;
+        index: number;
+        loadedData?: ArrayBufferView;
+        loadedObservable?: Observable<IGLTFBuffer>;
     }
 
     export interface IGLTFBufferView extends IGLTFChildRootProperty {
@@ -129,6 +134,9 @@ module BABYLON.GLTF2 {
         byteOffset?: number;
         byteLength: number;
         byteStride?: number;
+
+        // Runtime values
+        index: number;
     }
 
     export interface IGLTFCameraOrthographic extends IGLTFProperty {
@@ -155,6 +163,9 @@ module BABYLON.GLTF2 {
         uri?: string;
         mimeType?: string;
         bufferView?: number;
+
+        // Runtime values
+        index: number;
     }
 
     export interface IGLTFMaterialNormalTextureInfo extends IGLTFTextureInfo {
@@ -184,8 +195,8 @@ module BABYLON.GLTF2 {
         doubleSided?: boolean;
 
         // Runtime values
-        index?: number;
-        babylonMaterial?: Material;
+        index: number;
+        babylonMaterial: Material;
     }
 
     export interface IGLTFMeshPrimitive extends IGLTFProperty {
@@ -194,11 +205,18 @@ module BABYLON.GLTF2 {
         material?: number;
         mode?: EMeshPrimitiveMode;
         targets?: { [name: string]: number }[];
+
+        // Runtime values
+        vertexData: VertexData;
+        targetsVertexData: VertexData[];
     }
 
     export interface IGLTFMesh extends IGLTFChildRootProperty {
         primitives: IGLTFMeshPrimitive[];
         weights?: number[];
+
+        // Runtime values
+        index: number;
     }
 
     export interface IGLTFNode extends IGLTFChildRootProperty {
@@ -213,9 +231,9 @@ module BABYLON.GLTF2 {
         weights?: number[];
 
         // Runtime values
-        index?: number;
+        index: number;
         parent?: IGLTFNode;
-        babylonMesh?: Mesh;
+        babylonMesh: Mesh;
         babylonBones?: { [skin: number]: Bone };
         babylonAnimationTargets?: Node[];
     }
@@ -229,6 +247,9 @@ module BABYLON.GLTF2 {
 
     export interface IGLTFScene extends IGLTFChildRootProperty {
         nodes: number[];
+
+        // Runtime values
+        index: number;
     }
 
     export interface IGLTFSkin extends IGLTFChildRootProperty {
@@ -237,8 +258,8 @@ module BABYLON.GLTF2 {
         joints: number[];
 
         // Runtime values
-        index?: number;
-        babylonSkeleton?: Skeleton;
+        index: number;
+        babylonSkeleton: Skeleton;
     }
 
     export interface IGLTFTexture extends IGLTFChildRootProperty {
@@ -246,6 +267,7 @@ module BABYLON.GLTF2 {
         source: number;
 
         // Runtime values
+        index: number;
         url?: string;
         dataReadyObservable?: Observable<IGLTFTexture>;
     }

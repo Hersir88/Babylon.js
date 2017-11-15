@@ -86,6 +86,10 @@ module BABYLON {
             return this.opacity < 1.0;
         }
 
+        public needAlphaBlendingForMesh(mesh: AbstractMesh): boolean {
+            return this.needAlphaBlending();
+        }
+
         public isReadyForSubMesh(mesh: AbstractMesh, subMesh: SubMesh, useInstances?: boolean): boolean {   
             if (this.isFrozen) {
                 if (this._wasPreviouslyReady && subMesh.effect) {
@@ -105,8 +109,6 @@ module BABYLON {
                     return true;
                 }
             }
-
-            var engine = scene.getEngine();
 
             if (defines.TRANSPARENT !== (this.opacity < 1.0)) {
                 defines.TRANSPARENT = !defines.TRANSPARENT;
@@ -135,12 +137,12 @@ module BABYLON {
                     ["projection", "worldView", "mainColor", "lineColor", "gridControl", "gridOffset", "vFogInfos", "vFogColor", "world", "view"],
                     [],
                     join,
-                    null,
+                    undefined,
                     this.onCompiled,
                     this.onError), defines);
             }
 
-            if (!subMesh.effect.isReady()) {
+            if (!subMesh.effect || !subMesh.effect.isReady()) {
                 return false;
             }
 
@@ -159,6 +161,9 @@ module BABYLON {
             }
 
             var effect = subMesh.effect;
+            if (!effect) {
+                return;
+            }
             this._activeEffect = effect;
 
             // Matrices

@@ -17,7 +17,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 };
 var BABYLON;
 (function (BABYLON) {
-    var FireMaterialDefines = (function (_super) {
+    var FireMaterialDefines = /** @class */ (function (_super) {
         __extends(FireMaterialDefines, _super);
         function FireMaterialDefines() {
             var _this = _super.call(this) || this;
@@ -38,7 +38,7 @@ var BABYLON;
         }
         return FireMaterialDefines;
     }(BABYLON.MaterialDefines));
-    var FireMaterial = (function (_super) {
+    var FireMaterial = /** @class */ (function (_super) {
         __extends(FireMaterial, _super);
         function FireMaterial(name, scene) {
             var _this = _super.call(this, name, scene) || this;
@@ -94,7 +94,7 @@ var BABYLON;
                 defines.FOG = (scene.fogEnabled && mesh.applyFog && scene.fogMode !== BABYLON.Scene.FOGMODE_NONE && this.fogEnabled);
             }
             // Values that need to be evaluated on every frame
-            BABYLON.MaterialHelper.PrepareDefinesForFrameBoundValues(scene, engine, defines, useInstances);
+            BABYLON.MaterialHelper.PrepareDefinesForFrameBoundValues(scene, engine, defines, useInstances ? true : false);
             // Attribs
             BABYLON.MaterialHelper.PrepareDefinesForAttributes(mesh, defines, false, true);
             // Get correct effect      
@@ -140,10 +140,13 @@ var BABYLON;
                     defines: join,
                     fallbacks: fallbacks,
                     onCompiled: this.onCompiled,
-                    onError: this.onError
+                    onError: this.onError,
+                    indexParameters: null,
+                    maxSimultaneousLights: 4,
+                    transformFeedbackVaryings: null
                 }, engine), defines);
             }
-            if (!subMesh.effect.isReady()) {
+            if (!subMesh.effect || !subMesh.effect.isReady()) {
                 return false;
             }
             this._renderId = scene.getRenderId();
@@ -157,6 +160,9 @@ var BABYLON;
                 return;
             }
             var effect = subMesh.effect;
+            if (!effect) {
+                return;
+            }
             this._activeEffect = effect;
             // Matrices
             this.bindOnlyWorldMatrix(world);
@@ -181,7 +187,7 @@ var BABYLON;
                 if (this.pointsCloud) {
                     this._activeEffect.setFloat("pointSize", this.pointSize);
                 }
-                this._activeEffect.setVector3("vEyePosition", scene._mirroredCameraPosition ? scene._mirroredCameraPosition : scene.activeCamera.position);
+                BABYLON.MaterialHelper.BindEyePosition(effect, scene);
             }
             this._activeEffect.setColor4("vDiffuseColor", this._scaledDiffuse, this.alpha * mesh.visibility);
             // View
@@ -293,32 +299,32 @@ var BABYLON;
             }
             return material;
         };
+        __decorate([
+            BABYLON.serializeAsTexture("diffuseTexture")
+        ], FireMaterial.prototype, "_diffuseTexture", void 0);
+        __decorate([
+            BABYLON.expandToProperty("_markAllSubMeshesAsTexturesDirty")
+        ], FireMaterial.prototype, "diffuseTexture", void 0);
+        __decorate([
+            BABYLON.serializeAsTexture("distortionTexture")
+        ], FireMaterial.prototype, "_distortionTexture", void 0);
+        __decorate([
+            BABYLON.expandToProperty("_markAllSubMeshesAsTexturesDirty")
+        ], FireMaterial.prototype, "distortionTexture", void 0);
+        __decorate([
+            BABYLON.serializeAsTexture("opacityTexture")
+        ], FireMaterial.prototype, "_opacityTexture", void 0);
+        __decorate([
+            BABYLON.expandToProperty("_markAllSubMeshesAsTexturesDirty")
+        ], FireMaterial.prototype, "opacityTexture", void 0);
+        __decorate([
+            BABYLON.serializeAsColor3("diffuse")
+        ], FireMaterial.prototype, "diffuseColor", void 0);
+        __decorate([
+            BABYLON.serialize()
+        ], FireMaterial.prototype, "speed", void 0);
         return FireMaterial;
     }(BABYLON.PushMaterial));
-    __decorate([
-        BABYLON.serializeAsTexture("diffuseTexture")
-    ], FireMaterial.prototype, "_diffuseTexture", void 0);
-    __decorate([
-        BABYLON.expandToProperty("_markAllSubMeshesAsTexturesDirty")
-    ], FireMaterial.prototype, "diffuseTexture", void 0);
-    __decorate([
-        BABYLON.serializeAsTexture("distortionTexture")
-    ], FireMaterial.prototype, "_distortionTexture", void 0);
-    __decorate([
-        BABYLON.expandToProperty("_markAllSubMeshesAsTexturesDirty")
-    ], FireMaterial.prototype, "distortionTexture", void 0);
-    __decorate([
-        BABYLON.serializeAsTexture("opacityTexture")
-    ], FireMaterial.prototype, "_opacityTexture", void 0);
-    __decorate([
-        BABYLON.expandToProperty("_markAllSubMeshesAsTexturesDirty")
-    ], FireMaterial.prototype, "opacityTexture", void 0);
-    __decorate([
-        BABYLON.serialize("diffuseColor")
-    ], FireMaterial.prototype, "diffuseColor", void 0);
-    __decorate([
-        BABYLON.serialize()
-    ], FireMaterial.prototype, "speed", void 0);
     BABYLON.FireMaterial = FireMaterial;
 })(BABYLON || (BABYLON = {}));
 

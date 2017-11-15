@@ -31,9 +31,8 @@ module BABYLON.GUI {
             return "VirtualKeyboard";
         }
 
-        private _createKey(key: string, propertySet?: KeyPropertySet) {
+        private _createKey(key: string, propertySet: Nullable<KeyPropertySet>) {
             var button = Button.CreateSimpleButton(key, key);
-            
            
             button.width = propertySet && propertySet.width ? propertySet.width : this.defaultButtonWidth;
             button.height = propertySet && propertySet.height ? propertySet.height : this.defaultButtonHeight;
@@ -46,6 +45,11 @@ module BABYLON.GUI {
         
             button.thickness = 0;
             button.isFocusInvisible = true;
+
+            button.shadowColor = this.shadowColor;
+            button.shadowBlur = this.shadowBlur;
+            button.shadowOffsetX = this.shadowOffsetX;
+            button.shadowOffsetY = this.shadowOffsetY;
         
             button.onPointerUpObservable.add(() => {
                 this.onKeyPressObservable.notifyObservers(key);
@@ -72,12 +76,12 @@ module BABYLON.GUI {
             this.addControl(panel);
         }
 
-        private _connectedInputText: InputText;
-        private _onFocusObserver: Observer<InputText>;
-        private _onBlurObserver: Observer<InputText>;
-        private _onKeyPressObserver: Observer<string>;
+        private _connectedInputText: Nullable<InputText>;
+        private _onFocusObserver: Nullable<Observer<InputText>>;
+        private _onBlurObserver: Nullable<Observer<InputText>>;
+        private _onKeyPressObserver: Nullable<Observer<string>>;
 
-        public get connectedInputText(): InputText {
+        public get connectedInputText(): Nullable<InputText> {
             return this._connectedInputText;
         }
 
@@ -95,6 +99,9 @@ module BABYLON.GUI {
             });		
 
             this._onKeyPressObserver = this.onKeyPressObservable.add((key) => {
+                if (!this._connectedInputText) {
+                    return;
+                }
                 switch (key) {
                     case "\u2190":
                         this._connectedInputText.processKey(8);

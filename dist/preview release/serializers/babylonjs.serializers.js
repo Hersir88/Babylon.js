@@ -1,4 +1,6 @@
-var BABYLON = BABYLON || (typeof require !== 'undefined' && require("babylonjs"));
+var globalObject = (typeof global !== 'undefined') ? global : ((typeof window !== 'undefined') ? window : this);
+var babylonDependency = (globalObject && globalObject.BABYLON) || BABYLON || (typeof require !== 'undefined' && require("babylonjs"));
+var BABYLON = babylonDependency;
 var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
 var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
 if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -18,7 +20,7 @@ var __extends = (this && this.__extends) || (function () {
         
 var BABYLON;
 (function (BABYLON) {
-    var OBJExport = (function () {
+    var OBJExport = /** @class */ (function () {
         function OBJExport() {
         }
         //Exports the geometrys of a Mesh array in .OBJ file format (text)
@@ -35,22 +37,32 @@ var BABYLON;
                 output.push("g object" + j);
                 output.push("o object_" + j);
                 //Uses the position of the item in the scene, to the file (this back to normal in the end)
+                var lastMatrix = null;
                 if (globalposition) {
                     var newMatrix = BABYLON.Matrix.Translation(mesh[j].position.x, mesh[j].position.y, mesh[j].position.z);
-                    var lastMatrix = BABYLON.Matrix.Translation(-(mesh[j].position.x), -(mesh[j].position.y), -(mesh[j].position.z));
+                    lastMatrix = BABYLON.Matrix.Translation(-(mesh[j].position.x), -(mesh[j].position.y), -(mesh[j].position.z));
                     mesh[j].bakeTransformIntoVertices(newMatrix);
                 }
                 //TODO: submeshes (groups)
                 //TODO: smoothing groups (s 1, s off);
                 if (materials) {
-                    output.push("usemtl " + mesh[j].material.id);
+                    var mat = mesh[j].material;
+                    if (mat) {
+                        output.push("usemtl " + mat.id);
+                    }
                 }
                 var g = mesh[j].geometry;
+                if (!g) {
+                    continue;
+                }
                 var trunkVerts = g.getVerticesData('position');
                 var trunkNormals = g.getVerticesData('normal');
                 var trunkUV = g.getVerticesData('uv');
                 var trunkFaces = g.getIndices();
                 var curV = 0;
+                if (!trunkVerts || !trunkNormals || !trunkUV || !trunkFaces) {
+                    continue;
+                }
                 for (var i = 0; i < trunkVerts.length; i += 3) {
                     output.push("v " + trunkVerts[i] + " " + trunkVerts[i + 1] + " " + trunkVerts[i + 2]);
                     curV++;
@@ -67,7 +79,7 @@ var BABYLON;
                         " " + (trunkFaces[i] + v) + "/" + (trunkFaces[i] + v) + "/" + (trunkFaces[i] + v));
                 }
                 //back de previous matrix, to not change the original mesh in the scene
-                if (globalposition) {
+                if (globalposition && lastMatrix) {
                     mesh[j].bakeTransformIntoVertices(lastMatrix);
                 }
                 v += curV;
@@ -132,17 +144,19 @@ var BABYLON;
 
 
 (function universalModuleDefinition(root, factory) {
+                var f = factory();
                 if (root && root["BABYLON"]) {
                     return;
                 }
+                
     if(typeof exports === 'object' && typeof module === 'object')
-        module.exports = factory();
+        module.exports = f;
     else if(typeof define === 'function' && define.amd)
-        define([], factory);
+        define(["BJSSerializers"], factory);
     else if(typeof exports === 'object')
-        exports["BJSSerializers"] = factory();
+        exports["BJSSerializers"] = f;
     else {
-        root["BABYLON"] = factory();
+        root["BABYLON"] = f;
     }
 })(this, function() {
     return BABYLON;

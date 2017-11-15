@@ -1,4 +1,6 @@
-var BABYLON = BABYLON || (typeof require !== 'undefined' && require("babylonjs"));
+var globalObject = (typeof global !== 'undefined') ? global : ((typeof window !== 'undefined') ? window : this);
+var babylonDependency = (globalObject && globalObject.BABYLON) || BABYLON || (typeof require !== 'undefined' && require("babylonjs"));
+var BABYLON = babylonDependency;
 var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
 var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
 if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -26,7 +28,7 @@ var BABYLON;
      * It basically takes care rendering the font front the given font size to a texture.
      * This is used later on in the postprocess.
      */
-    var AsciiArtFontTexture = (function (_super) {
+    var AsciiArtFontTexture = /** @class */ (function (_super) {
         __extends(AsciiArtFontTexture, _super);
         /**
          * Create a new instance of the Ascii Art FontTexture class
@@ -36,7 +38,12 @@ var BABYLON;
          * @param scene the scene that owns the texture
          */
         function AsciiArtFontTexture(name, font, text, scene) {
+            if (scene === void 0) { scene = null; }
             var _this = _super.call(this, scene) || this;
+            scene = _this.getScene();
+            if (!scene) {
+                return _this;
+            }
             _this.name = name;
             _this._text == text;
             _this._font == font;
@@ -68,7 +75,7 @@ var BABYLON;
                 context.fillText(text[i], i * _this._charSize, -maxCharHeight.offset);
             }
             // Flush the text in the dynamic texture.
-            _this.getScene().getEngine().updateDynamicTexture(_this._texture, canvas, false, true);
+            scene.getEngine().updateDynamicTexture(_this._texture, canvas, false, true);
             return _this;
         }
         Object.defineProperty(AsciiArtFontTexture.prototype, "charSize", {
@@ -148,14 +155,14 @@ var BABYLON;
             var texture = BABYLON.SerializationHelper.Parse(function () { return new AsciiArtFontTexture(source.name, source.font, source.text, scene); }, source, scene, null);
             return texture;
         };
+        __decorate([
+            BABYLON.serialize("font")
+        ], AsciiArtFontTexture.prototype, "_font", void 0);
+        __decorate([
+            BABYLON.serialize("text")
+        ], AsciiArtFontTexture.prototype, "_text", void 0);
         return AsciiArtFontTexture;
     }(BABYLON.BaseTexture));
-    __decorate([
-        BABYLON.serialize("font")
-    ], AsciiArtFontTexture.prototype, "_font", void 0);
-    __decorate([
-        BABYLON.serialize("text")
-    ], AsciiArtFontTexture.prototype, "_text", void 0);
     BABYLON.AsciiArtFontTexture = AsciiArtFontTexture;
     /**
      * AsciiArtPostProcess helps rendering everithing in Ascii Art.
@@ -163,7 +170,7 @@ var BABYLON;
      * Simmply add it to your scene and let the nerd that lives in you have fun.
      * Example usage: var pp = new AsciiArtPostProcess("myAscii", "20px Monospace", camera);
      */
-    var AsciiArtPostProcess = (function (_super) {
+    var AsciiArtPostProcess = /** @class */ (function (_super) {
         __extends(AsciiArtPostProcess, _super);
         /**
          * Instantiates a new Ascii Art Post Process.
@@ -230,7 +237,7 @@ var BABYLON;
      * It basically takes care rendering the font front the given font size to a texture.
      * This is used later on in the postprocess.
      */
-    var DigitalRainFontTexture = (function (_super) {
+    var DigitalRainFontTexture = /** @class */ (function (_super) {
         __extends(DigitalRainFontTexture, _super);
         /**
          * Create a new instance of the Digital Rain FontTexture class
@@ -240,7 +247,12 @@ var BABYLON;
          * @param scene the scene that owns the texture
          */
         function DigitalRainFontTexture(name, font, text, scene) {
+            if (scene === void 0) { scene = null; }
             var _this = _super.call(this, scene) || this;
+            scene = _this.getScene();
+            if (!scene) {
+                return _this;
+            }
             _this.name = name;
             _this._text == text;
             _this._font == font;
@@ -272,7 +284,7 @@ var BABYLON;
                 context.fillText(text[i], 0, i * _this._charSize - maxCharHeight.offset);
             }
             // Flush the text in the dynamic texture.
-            _this.getScene().getEngine().updateDynamicTexture(_this._texture, canvas, false, true);
+            scene.getEngine().updateDynamicTexture(_this._texture, canvas, false, true);
             return _this;
         }
         Object.defineProperty(DigitalRainFontTexture.prototype, "charSize", {
@@ -352,14 +364,14 @@ var BABYLON;
             var texture = BABYLON.SerializationHelper.Parse(function () { return new DigitalRainFontTexture(source.name, source.font, source.text, scene); }, source, scene, null);
             return texture;
         };
+        __decorate([
+            BABYLON.serialize("font")
+        ], DigitalRainFontTexture.prototype, "_font", void 0);
+        __decorate([
+            BABYLON.serialize("text")
+        ], DigitalRainFontTexture.prototype, "_text", void 0);
         return DigitalRainFontTexture;
     }(BABYLON.BaseTexture));
-    __decorate([
-        BABYLON.serialize("font")
-    ], DigitalRainFontTexture.prototype, "_font", void 0);
-    __decorate([
-        BABYLON.serialize("text")
-    ], DigitalRainFontTexture.prototype, "_text", void 0);
     BABYLON.DigitalRainFontTexture = DigitalRainFontTexture;
     /**
      * DigitalRainPostProcess helps rendering everithing in digital rain.
@@ -367,7 +379,7 @@ var BABYLON;
      * Simmply add it to your scene and let the nerd that lives in you have fun.
      * Example usage: var pp = new DigitalRainPostProcess("digitalRain", "20px Monospace", camera);
      */
-    var DigitalRainPostProcess = (function (_super) {
+    var DigitalRainPostProcess = /** @class */ (function (_super) {
         __extends(DigitalRainPostProcess, _super);
         /**
          * Instantiates a new Digital Rain Post Process.
@@ -434,17 +446,19 @@ BABYLON.Effect.ShadersStore['digitalrainPixelShader'] = "\nvarying vec2 vUV;\nun
 
 
 (function universalModuleDefinition(root, factory) {
+                var f = factory();
                 if (root && root["BABYLON"]) {
                     return;
                 }
+                
     if(typeof exports === 'object' && typeof module === 'object')
-        module.exports = factory();
+        module.exports = f;
     else if(typeof define === 'function' && define.amd)
-        define([], factory);
+        define(["BJSPostProcess"], factory);
     else if(typeof exports === 'object')
-        exports["BJSPostProcess"] = factory();
+        exports["BJSPostProcess"] = f;
     else {
-        root["BABYLON"] = factory();
+        root["BABYLON"] = f;
     }
 })(this, function() {
     return BABYLON;

@@ -19,6 +19,7 @@ if (BABYLON.Engine.isSupported()) {
     var currentSkybox;
     var enableDebugLayer = false;
     var currentPluginName;
+    var toExecuteAfterSceneCreation;
 
     canvas.addEventListener("contextmenu", function(evt) {
         evt.preventDefault();
@@ -37,13 +38,8 @@ if (BABYLON.Engine.isSupported()) {
         if (plugin.name !== "gltf") {
             return;
         }
-        plugin.onBeforeMaterialReadyAsync = function(material, mesh, isLOD, callback) {
-            if (!isLOD) {
-                callback();
-                return;
-            }
-            material.forceCompilation(mesh, callback);
-        }
+
+        plugin.compileMaterials = true;
     });
 
     // Resize
@@ -79,20 +75,23 @@ if (BABYLON.Engine.isSupported()) {
         if (!currentScene.activeCamera || currentScene.lights.length === 0) {
             currentScene.createDefaultCameraOrLight(true);
             // Enable camera's behaviors
-            currentScene.activeCamera.useBouncingBehavior = true;
             currentScene.activeCamera.useFramingBehavior = true;
 
             var framingBehavior = currentScene.activeCamera.getBehaviorByName("Framing");
             framingBehavior.framingTime = 0;
             framingBehavior.elevationReturnTime = -1;
 
-            var bouncingBehavior = currentScene.activeCamera.getBehaviorByName("Bouncing");
-            bouncingBehavior.autoTransitionRange = true;
-
             if (currentScene.meshes.length) {
                 var worldExtends = currentScene.getWorldExtends();
+                currentScene.activeCamera.lowerRadiusLimit = null;
                 framingBehavior.zoomOnBoundingInfo(worldExtends.min, worldExtends.max);
             }
+
+            currentScene.activeCamera.pinchPrecision = 200 / currentScene.activeCamera.radius;
+            currentScene.activeCamera.upperRadiusLimit = 5 * currentScene.activeCamera.radius;
+
+            currentScene.activeCamera.wheelDeltaPercentage = 0.01;
+            currentScene.activeCamera.pinchDeltaPercentage = 0.01;
         }
 
         currentScene.activeCamera.attachControl(canvas); 
@@ -101,6 +100,9 @@ if (BABYLON.Engine.isSupported()) {
         if (currentPluginName === "gltf") {
             var hdrTexture = BABYLON.CubeTexture.CreateFromPrefilteredData("Assets/environment.dds", currentScene);
             currentSkybox = currentScene.createDefaultSkybox(hdrTexture, true, (currentScene.activeCamera.maxZ - currentScene.activeCamera.minZ) / 2, 0.3);
+
+            // glTF assets use a +Z forward convention while the default camera faces +Z. Rotate the camera to look at the front of the asset.
+            currentScene.activeCamera.alpha += Math.PI;
         }
 
         // In case of error during loading, meshes will be empty and clearColor is set to red
@@ -125,6 +127,11 @@ if (BABYLON.Engine.isSupported()) {
                 currentScene.activeCamera.keysRight.push(68); // D
             }
         }
+
+        if (toExecuteAfterSceneCreation) {
+            toExecuteAfterSceneCreation();
+        }
+
     };
 
     var sceneError = function (sceneFile, babylonScene, message) {
@@ -147,11 +154,22 @@ if (BABYLON.Engine.isSupported()) {
     filesInput.onProcessFileCallback = (function (file, name, extension) {
         if (extension === "dds") {
             BABYLON.FilesInput.FilesToLoad[name] = file;
-            var newHdrTexture = BABYLON.CubeTexture.CreateFromPrefilteredData("file:" + file.correctName, currentScene);
-            if (currentSkybox) {
-                currentSkybox.dispose();
+            var loadTexture = () => {
+                if (currentPluginName === "gltf") { // currentPluginName is updated only once scene is loaded
+                    var newHdrTexture = BABYLON.CubeTexture.CreateFromPrefilteredData("file:" + file.correctName, currentScene);
+                    if (currentSkybox) {
+                        currentSkybox.dispose();
+                    }
+                    currentSkybox = currentScene.createDefaultSkybox(newHdrTexture, true, (currentScene.activeCamera.maxZ - currentScene.activeCamera.minZ) / 2, 0.3);
+                }
             }
-            currentSkybox = currentScene.createDefaultSkybox(newHdrTexture, true, (currentScene.activeCamera.maxZ - currentScene.activeCamera.minZ) / 2, 0.3);
+            if (currentScene) {
+                loadTexture();
+            }
+            else {
+                // Postpone texture loading until scene is loaded
+                toExecuteAfterSceneCreation = loadTexture;
+            }
             return false;
         }
         return true;
@@ -203,5 +221,20 @@ if (BABYLON.Engine.isSupported()) {
                 localStorage.setItem("helpcounter", currentHelpCounter + 1);
             }, 5000);
         }, 5000);
+    }
+
+    sizeScene();
+
+    window.onresize = function () {
+        sizeScene();
+    }
+}
+
+function sizeScene () {
+    let divInspWrapper = document.getElementsByClassName('insp-wrapper')[0];
+    if (divInspWrapper) {
+        let divFooter = document.getElementsByClassName('footer')[0];
+        divInspWrapper.style.height = (document.body.clientHeight - divFooter.clientHeight) + "px";
+        divInspWrapper.style['max-width'] = document.body.clientWidth + "px";
     }
 }

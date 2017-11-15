@@ -23,6 +23,22 @@
         });
     };
 
+    var editorOptions = {
+        value: "",
+        language: "javascript",
+        lineNumbers: true,
+        tabSize: "auto",
+        insertSpaces: "auto",
+        roundedSelection: true,
+        automaticLayout: true,
+        scrollBeyondLastLine: false,
+        readOnly: false,
+        theme: "vs",
+        contextmenu: false,
+        folding: true,
+        showFoldingControls: "always",
+        renderIndentGuides: true
+    };
 
     var fontSize = 14;
 
@@ -59,7 +75,7 @@
             markDirty();
         });
 
-        var snippetUrl = "https://babylonjs-api2.azurewebsites.net/snippets";
+        var snippetUrl = "//babylonjs-api2.azurewebsites.net/snippets";
         var currentSnippetToken;
         var currentSnippetTitle = null;
         var currentSnippetDescription = null;
@@ -340,6 +356,7 @@
                 document.getElementById("errorZone").style.display = 'none';
                 document.getElementById("errorZone").innerHTML = "";
                 document.getElementById("statusBar").innerHTML = "Loading assets...Please wait";
+                var checkCamera = true;
 
                 engine.runRenderLoop(function () {
                     if (engine.scenes.length === 0) {
@@ -362,7 +379,17 @@
 
                 var code = jsEditor.getValue();
                 var scene;
-                if (code.indexOf("createScene") !== -1) { // createScene
+                if (code.indexOf("delayCreateScene") !== -1) { // createScene
+                    eval(code);
+                    scene = delayCreateScene();
+                    checkCamera = false;
+                    if (!scene) {
+                        showError("delayCreateScene function must return a scene.", null);
+                        return;
+                    }
+
+                    zipCode = code + "\r\n\r\nvar scene = createScene();";
+                } else if (code.indexOf("createScene") !== -1) { // createScene
                     eval(code);
                     scene = createScene();
                     if (!scene) {
@@ -402,7 +429,7 @@
                     return;
                 }
 
-                if (engine.scenes[0].activeCamera == null) {
+                if (checkCamera && engine.scenes[0].activeCamera == null) {
                     showError("You must at least create a camera.", null);
                     return;
                 }
@@ -685,19 +712,8 @@
 
             var oldCode = jsEditor.getValue();
             jsEditor.dispose();
-            jsEditor = monaco.editor.create(document.getElementById('jsEditor'), {
-                value: "",
-                language: "javascript",
-                lineNumbers: true,
-                tabSize: "auto",
-                insertSpaces: "auto",
-                roundedSelection: true,
-                scrollBeyondLastLine: false,
-                automaticLayout: true,
-                readOnly: false,
-                theme: vsTheme,
-                contextmenu: false
-            });
+            editorOptions.theme = vsTheme;
+            jsEditor = monaco.editor.create(document.getElementById('jsEditor'), editorOptions);
             jsEditor.setValue(oldCode);
             setFontSize(fontSize);
 
@@ -977,20 +993,7 @@
                 require(['vs/editor/editor.main'], function () {
                     monaco.languages.typescript.javascriptDefaults.addExtraLib(xhr.responseText, 'babylon.d.ts');
 
-                    jsEditor = monaco.editor.create(document.getElementById('jsEditor'), {
-                        value: "",
-                        language: "javascript",
-                        lineNumbers: true,
-                        tabSize: "auto",
-                        insertSpaces: "auto",
-                        roundedSelection: true,
-                        scrollBeyondLastLine: false,
-                        automaticLayout: true,
-                        readOnly: false,
-                        theme: "vs",
-                        contextmenu: false,
-                        folding: true
-                    });
+                    jsEditor = monaco.editor.create(document.getElementById('jsEditor'), editorOptions);
 
                     run();
                 });

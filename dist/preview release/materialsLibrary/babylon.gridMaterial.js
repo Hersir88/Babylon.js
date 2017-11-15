@@ -17,7 +17,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 };
 var BABYLON;
 (function (BABYLON) {
-    var GridMaterialDefines = (function (_super) {
+    var GridMaterialDefines = /** @class */ (function (_super) {
         __extends(GridMaterialDefines, _super);
         function GridMaterialDefines() {
             var _this = _super.call(this) || this;
@@ -33,7 +33,7 @@ var BABYLON;
      * The grid materials allows you to wrap any shape with a grid.
      * Colors are customizable.
      */
-    var GridMaterial = (function (_super) {
+    var GridMaterial = /** @class */ (function (_super) {
         __extends(GridMaterial, _super);
         /**
          * constructor
@@ -83,6 +83,9 @@ var BABYLON;
         GridMaterial.prototype.needAlphaBlending = function () {
             return this.opacity < 1.0;
         };
+        GridMaterial.prototype.needAlphaBlendingForMesh = function (mesh) {
+            return this.needAlphaBlending();
+        };
         GridMaterial.prototype.isReadyForSubMesh = function (mesh, subMesh, useInstances) {
             if (this.isFrozen) {
                 if (this._wasPreviouslyReady && subMesh.effect) {
@@ -99,7 +102,6 @@ var BABYLON;
                     return true;
                 }
             }
-            var engine = scene.getEngine();
             if (defines.TRANSPARENT !== (this.opacity < 1.0)) {
                 defines.TRANSPARENT = !defines.TRANSPARENT;
                 defines.markAsUnprocessed();
@@ -117,9 +119,9 @@ var BABYLON;
                 var attribs = [BABYLON.VertexBuffer.PositionKind, BABYLON.VertexBuffer.NormalKind];
                 // Defines
                 var join = defines.toString();
-                subMesh.setEffect(scene.getEngine().createEffect("grid", attribs, ["projection", "worldView", "mainColor", "lineColor", "gridControl", "gridOffset", "vFogInfos", "vFogColor", "world", "view"], [], join, null, this.onCompiled, this.onError), defines);
+                subMesh.setEffect(scene.getEngine().createEffect("grid", attribs, ["projection", "worldView", "mainColor", "lineColor", "gridControl", "gridOffset", "vFogInfos", "vFogColor", "world", "view"], [], join, undefined, this.onCompiled, this.onError), defines);
             }
-            if (!subMesh.effect.isReady()) {
+            if (!subMesh.effect || !subMesh.effect.isReady()) {
                 return false;
             }
             this._renderId = scene.getRenderId();
@@ -133,6 +135,9 @@ var BABYLON;
                 return;
             }
             var effect = subMesh.effect;
+            if (!effect) {
+                return;
+            }
             this._activeEffect = effect;
             // Matrices
             this.bindOnlyWorldMatrix(world);
@@ -172,32 +177,32 @@ var BABYLON;
         GridMaterial.Parse = function (source, scene, rootUrl) {
             return BABYLON.SerializationHelper.Parse(function () { return new GridMaterial(source.name, scene); }, source, scene, rootUrl);
         };
+        __decorate([
+            BABYLON.serializeAsColor3()
+        ], GridMaterial.prototype, "mainColor", void 0);
+        __decorate([
+            BABYLON.serializeAsColor3()
+        ], GridMaterial.prototype, "lineColor", void 0);
+        __decorate([
+            BABYLON.serialize()
+        ], GridMaterial.prototype, "gridRatio", void 0);
+        __decorate([
+            BABYLON.serializeAsColor3()
+        ], GridMaterial.prototype, "gridOffset", void 0);
+        __decorate([
+            BABYLON.serialize()
+        ], GridMaterial.prototype, "majorUnitFrequency", void 0);
+        __decorate([
+            BABYLON.serialize()
+        ], GridMaterial.prototype, "minorUnitVisibility", void 0);
+        __decorate([
+            BABYLON.serialize()
+        ], GridMaterial.prototype, "opacity", void 0);
+        __decorate([
+            BABYLON.serialize()
+        ], GridMaterial.prototype, "preMultiplyAlpha", void 0);
         return GridMaterial;
     }(BABYLON.PushMaterial));
-    __decorate([
-        BABYLON.serializeAsColor3()
-    ], GridMaterial.prototype, "mainColor", void 0);
-    __decorate([
-        BABYLON.serializeAsColor3()
-    ], GridMaterial.prototype, "lineColor", void 0);
-    __decorate([
-        BABYLON.serialize()
-    ], GridMaterial.prototype, "gridRatio", void 0);
-    __decorate([
-        BABYLON.serializeAsColor3()
-    ], GridMaterial.prototype, "gridOffset", void 0);
-    __decorate([
-        BABYLON.serialize()
-    ], GridMaterial.prototype, "majorUnitFrequency", void 0);
-    __decorate([
-        BABYLON.serialize()
-    ], GridMaterial.prototype, "minorUnitVisibility", void 0);
-    __decorate([
-        BABYLON.serialize()
-    ], GridMaterial.prototype, "opacity", void 0);
-    __decorate([
-        BABYLON.serialize()
-    ], GridMaterial.prototype, "preMultiplyAlpha", void 0);
     BABYLON.GridMaterial = GridMaterial;
 })(BABYLON || (BABYLON = {}));
 
