@@ -35,9 +35,9 @@
          */
         public getClassName(): string {
             return "InstancedMesh";
-        }          
+        }
 
-        // Methods
+        // Methods      
         public get receiveShadows(): boolean {
             return this._sourceMesh.receiveShadows;
         }
@@ -67,6 +67,15 @@
 
         public get sourceMesh(): Mesh {
             return this._sourceMesh;
+        }
+
+        /**
+         * Is this node ready to be used/rendered
+         * @param completeCheck defines if a complete check (including materials and lights) has to be done (false by default)
+         * @return {boolean} is it ready
+         */
+        public isReady(completeCheck = false): boolean {
+            return this._sourceMesh.isReady(completeCheck, true);
         }
 
         /**
@@ -103,7 +112,7 @@
          */
         public setVerticesData(kind: string, data: FloatArray, updatable?: boolean, stride?: number): Mesh {
             if (this.sourceMesh) {
-               this.sourceMesh.setVerticesData(kind, data, updatable, stride);
+                this.sourceMesh.setVerticesData(kind, data, updatable, stride);
             }
             return this.sourceMesh;
         }
@@ -134,7 +143,7 @@
          */
         public updateVerticesData(kind: string, data: FloatArray, updateExtends?: boolean, makeItUnique?: boolean): Mesh {
             if (this.sourceMesh) {
-               this.sourceMesh.updateVerticesData(kind, data, updateExtends, makeItUnique);
+                this.sourceMesh.updateVerticesData(kind, data, updateExtends, makeItUnique);
             }
             return this.sourceMesh;
         }
@@ -148,7 +157,7 @@
          */
         public setIndices(indices: IndicesArray, totalVertices: Nullable<number> = null): Mesh {
             if (this.sourceMesh) {
-               this.sourceMesh.setIndices(indices, totalVertices);
+                this.sourceMesh.setIndices(indices, totalVertices);
             }
             return this.sourceMesh;
         }
@@ -273,13 +282,13 @@
          * Disposes the InstancedMesh.  
          * Returns nothing.  
          */
-        public dispose(doNotRecurse?: boolean): void {
+        public dispose(doNotRecurse?: boolean, disposeMaterialAndTextures = false): void {
 
             // Remove from mesh
             var index = this._sourceMesh.instances.indexOf(this);
             this._sourceMesh.instances.splice(index, 1);
 
-            super.dispose(doNotRecurse);
+            super.dispose(doNotRecurse, disposeMaterialAndTextures);
         }
     }
 } 

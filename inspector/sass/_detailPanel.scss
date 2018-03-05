@@ -16,8 +16,10 @@
     width:100%;
 
     .base-property {
-        word-wrap: break-word;
         padding: 2px 0 2px 0;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        overflow: hidden;
     }
     // Property name
     .prop-name {
@@ -29,7 +31,7 @@
     .prop-value {
         @extend .base-property;
         width:59%;
-        padding-left:10px;
+        padding-left:5px;
         &.clickable {
             cursor:pointer;
             &:hover {
@@ -111,7 +113,8 @@
   // The div displaying a color
   .color-element {
       @extend .element-viewer;
-      top: 2px;
+      width: 20px;
+      height: 15px;
   }
 
   // The div displaying a texture element

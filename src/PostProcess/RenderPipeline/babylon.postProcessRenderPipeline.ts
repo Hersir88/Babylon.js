@@ -1,6 +1,5 @@
 module BABYLON {
     export class PostProcessRenderPipeline {
-        private _engine: Engine;
 
         private _renderEffects: {[key: string]: PostProcessRenderEffect};
         private _renderEffectsForIsolatedPass: PostProcessRenderEffect[];
@@ -11,11 +10,7 @@ module BABYLON {
         @serialize()
         public _name: string;
 
-        private static PASS_EFFECT_NAME: string = "passEffect";
-        private static PASS_SAMPLER_NAME: string = "passSampler";
-
-        constructor(engine: Engine, name: string) {
-            this._engine = engine;
+        constructor(private engine: Engine, name: string) {
             this._name = name;
 
             this._renderEffects = {};
@@ -128,76 +123,6 @@ module BABYLON {
             }
         }
 
-        public _enableDisplayOnlyPass(passName: string, cameras: Camera): void;
-        public _enableDisplayOnlyPass(passName: string, cameras: Nullable<Camera[]>): void;
-        public _enableDisplayOnlyPass(passName: string, cameras: any): void {
-            var cams = Tools.MakeArray(cameras || this._cameras);
-
-            if (!cams) {
-                return;
-            }
-
-            var pass: Nullable<PostProcessRenderPass> = null;
-            var renderEffectName;
-            for (renderEffectName in this._renderEffects) {
-                if (this._renderEffects.hasOwnProperty(renderEffectName)) {
-                    pass = this._renderEffects[renderEffectName].getPass(passName);
-
-                    if (pass != null) {
-                        break;
-                    }
-                }
-            }
-
-            if (pass === null) {
-                return;
-            }
-
-            for (renderEffectName in this._renderEffects) {
-                if (this._renderEffects.hasOwnProperty(renderEffectName)) {
-                    this._renderEffects[renderEffectName]._disable(cams);
-                }
-            }
-
-            pass._name = PostProcessRenderPipeline.PASS_SAMPLER_NAME;
-
-            for (var i = 0; i < cams.length; i++) {
-                var camera = cams[i];
-                var cameraName = camera.name;
-
-                this._renderEffectsForIsolatedPass[cameraName] = this._renderEffectsForIsolatedPass[cameraName] || new PostProcessRenderEffect(this._engine, PostProcessRenderPipeline.PASS_EFFECT_NAME,
-                    () => {return new DisplayPassPostProcess(PostProcessRenderPipeline.PASS_EFFECT_NAME, 1.0, null, undefined, this._engine, true) });
-                this._renderEffectsForIsolatedPass[cameraName].emptyPasses();
-                this._renderEffectsForIsolatedPass[cameraName].addPass(pass);
-                this._renderEffectsForIsolatedPass[cameraName]._attachCameras(camera);
-            }
-        }
-
-        public _disableDisplayOnlyPass(cameras: Camera): void;
-        public _disableDisplayOnlyPass(cameras: Camera[]): void;
-        public _disableDisplayOnlyPass(cameras: any): void {
-            var cams = Tools.MakeArray(cameras || this._cameras);
-
-            if (!cams) {
-                return;
-            }
-
-            for (var i = 0; i < cams.length; i++) {
-                var camera = cams[i];
-                var cameraName = camera.name;
-
-                this._renderEffectsForIsolatedPass[cameraName] = this._renderEffectsForIsolatedPass[cameraName] || new PostProcessRenderEffect(this._engine, PostProcessRenderPipeline.PASS_EFFECT_NAME, 
-                                    () => {return new DisplayPassPostProcess(PostProcessRenderPipeline.PASS_EFFECT_NAME, 1.0, null, undefined, this._engine, true) });
-                this._renderEffectsForIsolatedPass[cameraName]._disable(camera);
-            }
-
-            for (var renderEffectName in this._renderEffects) {
-                if (this._renderEffects.hasOwnProperty(renderEffectName)) {
-                    this._renderEffects[renderEffectName]._enable(cams);
-                }
-            }
-        }
-
         public _update(): void {
             for (var renderEffectName in this._renderEffects) {
                 if (this._renderEffects.hasOwnProperty(renderEffectName)) {
@@ -216,6 +141,19 @@ module BABYLON {
         public _reset(): void {
             this._renderEffects = {};
             this._renderEffectsForIsolatedPass = new Array<PostProcessRenderEffect>();
+        }
+
+        protected _enableMSAAOnFirstPostProcess():boolean{
+            // Set samples of the very first post process to 4 to enable native anti-aliasing in browsers that support webGL 2.0 (See: https://github.com/BabylonJS/Babylon.js/issues/3754)
+            var effectKeys = Object.keys(this._renderEffects);
+            if(this.engine.webGLVersion >= 2 && effectKeys.length > 0){
+                var postProcesses = this._renderEffects[effectKeys[0]].getPostProcesses();
+                if(postProcesses){
+                    postProcesses[0].samples = 4;
+                    return true;
+                }
+            }
+            return false;
         }
 
         public dispose() {

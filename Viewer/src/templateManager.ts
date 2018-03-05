@@ -1,6 +1,6 @@
 
-import { Observable } from 'babylonjs';
-import { isUrl, loadFile, camelToKebab, kebabToCamel } from './helper';
+import { Observable, IFileRequest, Tools } from 'babylonjs';
+import { isUrl, camelToKebab, kebabToCamel } from './helper';
 
 export interface ITemplateConfiguration {
     location?: string; // #template-id OR http://example.com/loading.html
@@ -40,6 +40,9 @@ export class TemplateManager {
     public onLoaded: Observable<Template>;
     public onStateChange: Observable<Template>;
     public onAllLoaded: Observable<TemplateManager>;
+    public onEventTriggered: Observable<EventCallback>;
+
+    public eventManager: EventManager;
 
     private templates: { [name: string]: Template };
 
@@ -50,6 +53,9 @@ export class TemplateManager {
         this.onLoaded = new Observable<Template>();
         this.onStateChange = new Observable<Template>();
         this.onAllLoaded = new Observable<TemplateManager>();
+        this.onEventTriggered = new Observable<EventCallback>();
+
+        this.eventManager = new EventManager(this);
     }
 
     public initTemplate(templates: { [key: string]: ITemplateConfiguration }) {
@@ -83,8 +89,13 @@ export class TemplateManager {
         }
 
         //build the html tree
-        this.buildHTMLTree(templates).then(htmlTree => {
-            internalInit(htmlTree, 'main');
+        return this.buildHTMLTree(templates).then(htmlTree => {
+            if (this.templates['main']) {
+                internalInit(htmlTree, 'main');
+            } else {
+                this.checkLoadedState();
+            }
+            return;
         });
     }
 
@@ -99,8 +110,13 @@ export class TemplateManager {
      * @memberof TemplateManager
      */
     private buildHTMLTree(templates: { [key: string]: ITemplateConfiguration }): Promise<object> {
-        let promises = Object.keys(templates).map(name => {
+        let promises: Array<Promise<Template | boolean>> = Object.keys(templates).map(name => {
+            // if the template was overridden
+            if (!templates[name]) return Promise.resolve(false);
+            // else - we have a template, let's do our job!
             let template = new Template(name, templates[name]);
+            // make sure the global onEventTriggered is called as well
+            template.onEventTriggered.add(eventData => this.onEventTriggered.notifyObservers(eventData));
             this.templates[name] = template;
             return template.initPromise;
         });
@@ -109,14 +125,16 @@ export class TemplateManager {
             let templateStructure = {};
             // now iterate through all templates and check for children:
             let buildTree = (parentObject, name) => {
+                this.templates[name].isInHtmlTree = true;
                 let childNodes = this.templates[name].getChildElements().filter(n => !!this.templates[n]);
                 childNodes.forEach(element => {
                     parentObject[element] = {};
                     buildTree(parentObject[element], element);
                 });
             }
-
-            buildTree(templateStructure, "main");
+            if (this.templates['main']) {
+                buildTree(templateStructure, "main");
+            }
             return templateStructure;
         });
     }
@@ -131,8 +149,8 @@ export class TemplateManager {
     }
 
     private checkLoadedState() {
-        let done = Object.keys(this.templates).every((key) => {
-            return this.templates[key].isLoaded && !!this.templates[key].parent;
+        let done = Object.keys(this.templates).length === 0 || Object.keys(this.templates).every((key) => {
+            return (this.templates[key].isLoaded && !!this.templates[key].parent) || !this.templates[key].isInHtmlTree;
         });
 
         if (done) {
@@ -140,10 +158,38 @@ export class TemplateManager {
         }
     }
 
+    public dispose() {
+        // dispose all templates
+        Object.keys(this.templates).forEach(template => {
+            this.templates[template].dispose();
+        });
+
+        this.onInit.clear();
+        this.onAllLoaded.clear();
+        this.onEventTriggered.clear();
+        this.onLoaded.clear();
+        this.onStateChange.clear();
+    }
+
 }
 
 
-import * as Handlebars from 'handlebars/dist/handlebars.min.js';
+import * as Handlebars from '../assets/handlebars.min.js';
+import { EventManager } from './eventManager';
+// register a new helper. modified https://stackoverflow.com/questions/9838925/is-there-any-method-to-iterate-a-map-with-handlebars-js
+Handlebars.registerHelper('eachInMap', function (map, block) {
+    var out = '';
+    Object.keys(map).map(function (prop) {
+        let data = map[prop];
+        if (typeof data === 'object') {
+            data.id = data.id || prop;
+            out += block.fn(data);
+        } else {
+            out += block.fn({ id: prop, value: data });
+        }
+    });
+    return out;
+});
 
 export class Template {
 
@@ -154,12 +200,22 @@ export class Template {
     public onEventTriggered: Observable<EventCallback>;
 
     public isLoaded: boolean;
+    /**
+     * This is meant to be used to track the show and hide functions.
+     * This is NOT (!!) a flag to check if the element is actually visible to the user.
+     */
+    public isShown: boolean;
+
+    public isInHtmlTree: boolean;
 
     public parent: HTMLElement;
 
     public initPromise: Promise<Template>;
 
     private fragment: DocumentFragment;
+    private htmlTemplate: string;
+
+    private loadRequests: Array<IFileRequest>;
 
     constructor(public name: string, private _configuration: ITemplateConfiguration) {
         this.onInit = new Observable<Template>();
@@ -168,7 +224,11 @@ export class Template {
         this.onStateChange = new Observable<Template>();
         this.onEventTriggered = new Observable<EventCallback>();
 
+        this.loadRequests = [];
+
         this.isLoaded = false;
+        this.isShown = false;
+        this.isInHtmlTree = false;
         /*
         if (configuration.id) {
             this.parent.id = configuration.id;
@@ -176,19 +236,36 @@ export class Template {
         */
         this.onInit.notifyObservers(this);
 
-        let htmlContentPromise = getTemplateAsHtml(_configuration);
+        let htmlContentPromise = this.getTemplateAsHtml(_configuration);
 
         this.initPromise = htmlContentPromise.then(htmlTemplate => {
             if (htmlTemplate) {
+                this.htmlTemplate = htmlTemplate;
                 let compiledTemplate = Handlebars.compile(htmlTemplate);
                 let config = this._configuration.params || {};
                 let rawHtml = compiledTemplate(config);
                 this.fragment = document.createRange().createContextualFragment(rawHtml);
                 this.isLoaded = true;
+                this.isShown = true;
                 this.onLoaded.notifyObservers(this);
             }
             return this;
         });
+    }
+
+    public updateParams(params: { [key: string]: string | number | boolean | object }) {
+        this._configuration.params = params;
+        // update the template
+        if (this.isLoaded) {
+            this.dispose();
+        }
+        let compiledTemplate = Handlebars.compile(this.htmlTemplate);
+        let config = this._configuration.params || {};
+        let rawHtml = compiledTemplate(config);
+        this.fragment = document.createRange().createContextualFragment(rawHtml);
+        if (this.parent) {
+            this.appendTo(this.parent, true);
+        }
     }
 
     public get configuration(): ITemplateConfiguration {
@@ -209,54 +286,121 @@ export class Template {
         return childrenArray;
     }
 
-    public appendTo(parent: HTMLElement) {
+    public appendTo(parent: HTMLElement, forceRemove?: boolean) {
         if (this.parent) {
-            console.error('Already appanded to ', this.parent);
-        } else {
-            this.parent = parent;
-
-            if (this._configuration.id) {
-                this.parent.id = this._configuration.id;
+            if (forceRemove) {
+                this.parent.removeChild(this.fragment);
+            } else {
+                return;
             }
-            this.parent.appendChild(this.fragment);
-            // appended only one frame after.
-            setTimeout(() => {
-                this.registerEvents();
-                this.onAppended.notifyObservers(this);
-            });
         }
+        this.parent = parent;
 
+        if (this._configuration.id) {
+            this.parent.id = this._configuration.id;
+        }
+        this.fragment = this.parent.appendChild(this.fragment);
+        // appended only one frame after.
+        setTimeout(() => {
+            this.registerEvents();
+            this.onAppended.notifyObservers(this);
+        });
     }
 
+    private isShowing: boolean;
+    private isHiding: boolean;
     public show(visibilityFunction?: (template: Template) => Promise<Template>): Promise<Template> {
-        if (visibilityFunction) {
-            return visibilityFunction(this).then(() => {
-                this.onStateChange.notifyObservers(this);
+        if (this.isHiding) return Promise.resolve(this);
+        return Promise.resolve().then(() => {
+            this.isShowing = true;
+            if (visibilityFunction) {
+                return visibilityFunction(this);
+            } else {
+                // flex? box? should this be configurable easier than the visibilityFunction?
+                this.parent.style.display = 'flex';
                 return this;
-            });
-        } else {
-            // flex? box? should this be configurable easier than the visibilityFunction?
-            this.parent.style.display = 'flex';
+            }
+        }).then(() => {
+            this.isShown = true;
+            this.isShowing = false;
             this.onStateChange.notifyObservers(this);
-            return Promise.resolve(this);
-        }
+            return this;
+        });
     }
 
     public hide(visibilityFunction?: (template: Template) => Promise<Template>): Promise<Template> {
-        if (visibilityFunction) {
-            return visibilityFunction(this).then(() => {
-                this.onStateChange.notifyObservers(this);
+        if (this.isShowing) return Promise.resolve(this);
+        return Promise.resolve().then(() => {
+            this.isHiding = true;
+            if (visibilityFunction) {
+                return visibilityFunction(this);
+            } else {
+                // flex? box? should this be configurable easier than the visibilityFunction?
+                this.parent.style.display = 'hide';
                 return this;
-            });
-        } else {
-            this.parent.style.display = 'none';
+            }
+        }).then(() => {
+            this.isShown = false;
+            this.isHiding = false;
             this.onStateChange.notifyObservers(this);
-            return Promise.resolve(this);
+            return this;
+        });
+    }
+
+    public dispose() {
+        this.onAppended.clear();
+        this.onEventTriggered.clear();
+        this.onInit.clear();
+        this.onLoaded.clear();
+        this.onStateChange.clear();
+        this.isLoaded = false;
+        // remove from parent
+        this.parent.removeChild(this.fragment);
+
+        this.loadRequests.forEach(request => {
+            request.abort();
+        });
+    }
+
+    private getTemplateAsHtml(templateConfig: ITemplateConfiguration): Promise<string> {
+        if (!templateConfig) {
+            return Promise.reject('No templateConfig provided');
+        } else if (templateConfig.html !== undefined) {
+            return Promise.resolve(templateConfig.html);
+        } else {
+            let location = getTemplateLocation(templateConfig);
+            if (isUrl(location)) {
+                return new Promise((resolve, reject) => {
+                    let fileRequest = Tools.LoadFile(location, (data: string) => {
+                        resolve(data);
+                    }, undefined, undefined, false, (request, error: any) => {
+                        reject(error);
+                    });
+                    this.loadRequests.push(fileRequest);
+                });
+            } else {
+                location = location.replace('#', '');
+                let element = document.getElementById(location);
+                if (element) {
+                    return Promise.resolve(element.innerHTML);
+                } else {
+                    return Promise.reject('Template ID not found');
+                }
+            }
         }
     }
 
+    private registeredEvents: Array<{ htmlElement: HTMLElement, eventName: string, function: EventListenerOrEventListenerObject }>;
+
     // TODO - Should events be removed as well? when are templates disposed?
     private registerEvents() {
+        this.registeredEvents = this.registeredEvents || [];
+        if (this.registeredEvents.length) {
+            // first remove the registered events
+            this.registeredEvents.forEach(evt => {
+                evt.htmlElement.removeEventListener(evt.eventName, evt.function);
+            });
+        }
         if (this._configuration.events) {
             for (let eventName in this._configuration.events) {
                 if (this._configuration.events && this._configuration.events[eventName]) {
@@ -272,36 +416,22 @@ export class Template {
                         // strict null checl is working incorrectly, must override:
                         let event = this._configuration.events[eventName] || {};
                         selectorsArray.filter(selector => event[selector]).forEach(selector => {
-                            if (selector.indexOf('#') !== 0) {
+                            if (selector && selector.indexOf('#') !== 0) {
                                 selector = '#' + selector;
                             }
                             let htmlElement = <HTMLElement>this.parent.querySelector(selector);
-                            htmlElement && htmlElement.addEventListener(eventName, functionToFire.bind(this, selector), false)
+                            if (htmlElement) {
+                                let binding = functionToFire.bind(this, selector);
+                                htmlElement.addEventListener(eventName, binding, false);
+                                this.registeredEvents.push({
+                                    htmlElement: htmlElement,
+                                    eventName: eventName,
+                                    function: binding
+                                });
+                            }
                         });
                     }
                 }
-            }
-        }
-    }
-
-}
-
-export function getTemplateAsHtml(templateConfig: ITemplateConfiguration): Promise<string> {
-    if (!templateConfig) {
-        return Promise.reject('No templateConfig provided');
-    } else if (templateConfig.html) {
-        return Promise.resolve(templateConfig.html);
-    } else {
-        let location = getTemplateLocation(templateConfig);
-        if (isUrl(location)) {
-            return loadFile(location);
-        } else {
-            location = location.replace('#', '');
-            let element = document.getElementById('#' + location);
-            if (element) {
-                return Promise.resolve(element.innerHTML);
-            } else {
-                return Promise.reject('Template ID not found');
             }
         }
     }

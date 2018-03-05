@@ -35,6 +35,11 @@
         public static WRAP_ADDRESSMODE = 1;
         public static MIRROR_ADDRESSMODE = 2;
 
+        /**
+         * Gets or sets a boolean which defines if the texture url must be build from the serialized URL instead of just using the name and loading them side by side with the scene file
+         */
+        public static UseSerializedUrlIfAny = false;
+
         // Members
         @serialize()
         public url: Nullable<string>;
@@ -88,7 +93,7 @@
         protected _format: Nullable<number>;
         private _delayedOnLoad: Nullable<() => void>;
         private _delayedOnError: Nullable<() => void>;
-        private _onLoadObservable: Nullable<Observable<Texture>>;
+        protected _onLoadObservable: Nullable<Observable<Texture>>;
 
         protected _isBlocking: boolean = true;
         public set isBlocking(value: boolean) {
@@ -103,7 +108,7 @@
             return this._samplingMode;
         }
 
-        constructor(url: Nullable<string>, scene: Nullable<Scene>, noMipmap: boolean = false, invertY: boolean = true, samplingMode: number = Texture.TRILINEAR_SAMPLINGMODE, onLoad: Nullable<() => void> = null, onError: Nullable<(message?: string, esception?: any) => void> = null, buffer: any = null, deleteBuffer: boolean = false, format?: number) {
+        constructor(url: Nullable<string>, scene: Nullable<Scene>, noMipmap: boolean = false, invertY: boolean = true, samplingMode: number = Texture.TRILINEAR_SAMPLINGMODE, onLoad: Nullable<() => void> = null, onError: Nullable<(message?: string, exception?: any) => void> = null, buffer: any = null, deleteBuffer: boolean = false, format?: number) {
             super(scene);
 
             this.name = url || "";
@@ -182,7 +187,7 @@
             if (!scene) {
                 return;
             }
-            
+
             this.delayLoadState = Engine.DELAYLOADSTATE_LOADED;
             this._texture = this._getFromCache(this.url, this._noMipmap, this._samplingMode);
 
@@ -192,19 +197,17 @@
                     delete this._buffer;
                 }
             } else {
-                if (this._texture.isReady) {
-                    Tools.SetImmediate(() => {
-                        if (!this._delayedOnLoad) {
-                            return;
-                        }
-                        this._delayedOnLoad();
-                    });
-                } else {
-                    if (this._delayedOnLoad) {
+                if (this._delayedOnLoad) {
+                    if (this._texture.isReady) {
+                        Tools.SetImmediate(this._delayedOnLoad);
+                    } else {
                         this._texture.onLoadedObservable.add(this._delayedOnLoad);
                     }
                 }
             }
+
+            this._delayedOnLoad = null;
+            this._delayedOnError = null;
         }
 
         public updateSamplingMode(samplingMode: number): void {
@@ -431,23 +434,32 @@
             }
 
             var texture = SerializationHelper.Parse(() => {
+                var generateMipMaps: boolean = true;
+                if (parsedTexture.noMipmap) {
+                    generateMipMaps = false;
+                }
                 if (parsedTexture.mirrorPlane) {
-                    var mirrorTexture = new MirrorTexture(parsedTexture.name, parsedTexture.renderTargetSize, scene);
+                    var mirrorTexture = new MirrorTexture(parsedTexture.name, parsedTexture.renderTargetSize, scene, generateMipMaps);
                     mirrorTexture._waitingRenderList = parsedTexture.renderList;
                     mirrorTexture.mirrorPlane = Plane.FromArray(parsedTexture.mirrorPlane);
 
                     return mirrorTexture;
                 } else if (parsedTexture.isRenderTarget) {
-                    var renderTargetTexture = new RenderTargetTexture(parsedTexture.name, parsedTexture.renderTargetSize, scene);
+                    var renderTargetTexture = new RenderTargetTexture(parsedTexture.name, parsedTexture.renderTargetSize, scene, generateMipMaps);
                     renderTargetTexture._waitingRenderList = parsedTexture.renderList;
 
                     return renderTargetTexture;
                 } else {
                     var texture: Texture;
                     if (parsedTexture.base64String) {
-                        texture = Texture.CreateFromBase64String(parsedTexture.base64String, parsedTexture.name, scene);
+                        texture = Texture.CreateFromBase64String(parsedTexture.base64String, parsedTexture.name, scene, !generateMipMaps);
                     } else {
-                        texture = new Texture(rootUrl + parsedTexture.name, scene);
+                        let url = rootUrl + parsedTexture.name; 
+
+                        if (Texture.UseSerializedUrlIfAny && parsedTexture.url ) {
+                            url = parsedTexture.url;
+                        }
+                        texture = new Texture(url, scene, !generateMipMaps);
                     }
 
                     return texture;

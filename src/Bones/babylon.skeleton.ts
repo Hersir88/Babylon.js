@@ -18,6 +18,16 @@
 
         private _lastAbsoluteTransformsUpdateId = -1;
 
+        /**
+         * Specifies if the skeleton should be serialized.
+         */
+        public doNotSerialize = false;        
+
+        /**
+         * Gets or sets the animation properties override
+         */
+        public animationPropertiesOverride: AnimationPropertiesOverride;        
+
         // Events
         /**
          * An event triggered before computing the skeleton's matrices

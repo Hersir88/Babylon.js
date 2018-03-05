@@ -1,4 +1,5 @@
 ﻿/// <reference path="../dist/preview release/babylon.d.ts" />
+/// <reference path="../dist/preview release/loaders/babylon.glTFFileLoader.d.ts" />
 
 if (BABYLON.Engine.isSupported()) {
     var canvas = document.getElementById("renderCanvas");
@@ -19,9 +20,9 @@ if (BABYLON.Engine.isSupported()) {
     var currentSkybox;
     var enableDebugLayer = false;
     var currentPluginName;
-    var toExecuteAfterSceneCreation;
+    var skyboxPath = "Assets/environment.dds";
 
-    canvas.addEventListener("contextmenu", function(evt) {
+    canvas.addEventListener("contextmenu", function (evt) {
         evt.preventDefault();
     }, false);
 
@@ -32,14 +33,9 @@ if (BABYLON.Engine.isSupported()) {
     if (!currentHelpCounter) currentHelpCounter = 0;
 
     // Setting up some GLTF values
-    BABYLON.SceneLoader.OnPluginActivatedObservable.add(function(plugin) {
+    BABYLON.GLTFFileLoader.IncrementalLoading = false;
+    BABYLON.SceneLoader.OnPluginActivatedObservable.add(function (plugin) {
         currentPluginName = plugin.name;
-
-        if (plugin.name !== "gltf") {
-            return;
-        }
-
-        plugin.compileMaterials = true;
     });
 
     // Resize
@@ -71,6 +67,11 @@ if (BABYLON.Engine.isSupported()) {
         // Fix for IE, otherwise it will change the default filter for files selection after first use
         htmlInput.value = "";
 
+        // removing glTF created camera
+        if (currentScene.activeCamera && currentPluginName === "gltf") {
+            currentScene.activeCamera.dispose();
+            currentScene.activeCamera = null;
+        }
         // Attach camera to canvas inputs
         if (!currentScene.activeCamera || currentScene.lights.length === 0) {
             currentScene.createDefaultCameraOrLight(true);
@@ -94,11 +95,11 @@ if (BABYLON.Engine.isSupported()) {
             currentScene.activeCamera.pinchDeltaPercentage = 0.01;
         }
 
-        currentScene.activeCamera.attachControl(canvas); 
+        currentScene.activeCamera.attachControl(canvas);
 
         // Environment
         if (currentPluginName === "gltf") {
-            var hdrTexture = BABYLON.CubeTexture.CreateFromPrefilteredData("Assets/environment.dds", currentScene);
+            var hdrTexture = BABYLON.CubeTexture.CreateFromPrefilteredData(skyboxPath, currentScene);
             currentSkybox = currentScene.createDefaultSkybox(hdrTexture, true, (currentScene.activeCamera.maxZ - currentScene.activeCamera.minZ) / 2, 0.3);
 
             // glTF assets use a +Z forward convention while the default camera faces +Z. Rotate the camera to look at the front of the asset.
@@ -128,10 +129,6 @@ if (BABYLON.Engine.isSupported()) {
             }
         }
 
-        if (toExecuteAfterSceneCreation) {
-            toExecuteAfterSceneCreation();
-        }
-
     };
 
     var sceneError = function (sceneFile, babylonScene, message) {
@@ -152,24 +149,9 @@ if (BABYLON.Engine.isSupported()) {
 
     filesInput = new BABYLON.FilesInput(engine, null, sceneLoaded, null, null, null, function () { BABYLON.Tools.ClearLogCache() }, null, sceneError);
     filesInput.onProcessFileCallback = (function (file, name, extension) {
-        if (extension === "dds") {
+        if (filesInput._filesToLoad && filesInput._filesToLoad.length === 1 && extension && extension.toLowerCase() === "dds") {
             BABYLON.FilesInput.FilesToLoad[name] = file;
-            var loadTexture = () => {
-                if (currentPluginName === "gltf") { // currentPluginName is updated only once scene is loaded
-                    var newHdrTexture = BABYLON.CubeTexture.CreateFromPrefilteredData("file:" + file.correctName, currentScene);
-                    if (currentSkybox) {
-                        currentSkybox.dispose();
-                    }
-                    currentSkybox = currentScene.createDefaultSkybox(newHdrTexture, true, (currentScene.activeCamera.maxZ - currentScene.activeCamera.minZ) / 2, 0.3);
-                }
-            }
-            if (currentScene) {
-                loadTexture();
-            }
-            else {
-                // Postpone texture loading until scene is loaded
-                toExecuteAfterSceneCreation = loadTexture;
-            }
+            skyboxPath = "file:" + file.correctName;
             return false;
         }
         return true;
@@ -230,7 +212,7 @@ if (BABYLON.Engine.isSupported()) {
     }
 }
 
-function sizeScene () {
+function sizeScene() {
     let divInspWrapper = document.getElementsByClassName('insp-wrapper')[0];
     if (divInspWrapper) {
         let divFooter = document.getElementsByClassName('footer')[0];

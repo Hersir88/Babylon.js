@@ -1,9 +1,17 @@
 ﻿module BABYLON {
+    /**
+	 * PostProcessManager is used to manage one or more post processes or post process pipelines
+     * See https://doc.babylonjs.com/how_to/how_to_use_postprocesses
+     */
     export class PostProcessManager {
         private _scene: Scene;
         private _indexBuffer: Nullable<WebGLBuffer>;
         private _vertexBuffers: { [key: string]: Nullable<VertexBuffer> } = {};
 
+        /**
+         * Creates a new instance of @see PostProcess
+         * @param scene The scene that the post process is associated with.
+         */
         constructor(scene: Scene) {
             this._scene = scene;
         }
@@ -38,7 +46,10 @@
 
             this._indexBuffer = this._scene.getEngine().createIndexBuffer(indices);
         }
-        
+
+        /**
+         * Rebuilds the vertex buffers of the manager.
+         */
         public _rebuild(): void {
             let vb = this._vertexBuffers[VertexBuffer.PositionKind];
 
@@ -48,8 +59,14 @@
             vb._rebuild();
             this._buildIndexBuffer();
         }
-        
+
         // Methods
+        /**
+         * Prepares a frame to be run through a post process.
+         * @param sourceTexture The input texture to the post procesess. (default: null)
+         * @param postProcesses An array of post processes to be run. (default: null)
+         * @returns True if the post processes were able to be run.
+         */
         public _prepareFrame(sourceTexture: Nullable<InternalTexture> = null, postProcesses: Nullable<PostProcess[]> = null): boolean {
             let camera = this._scene.activeCamera;
             if (!camera) {
@@ -66,11 +83,13 @@
             return true;
         }
 
+        /**
+         * Manually render a set of post processes to a texture.
+         * @param postProcesses An array of post processes to be run.
+         * @param targetTexture The target texture to render to.
+         * @param forceFullscreenViewport force gl.viewport to be full screen eg. 0,0,textureWidth,textureHeight
+         */
         public directRender(postProcesses: PostProcess[], targetTexture: Nullable<InternalTexture> = null, forceFullscreenViewport = false): void {
-            if (!this._scene.activeCamera) {
-                return;
-            }
-
             var engine = this._scene.getEngine();
 
             for (var index = 0; index < postProcesses.length; index++) {
@@ -95,7 +114,7 @@
                     engine.bindBuffers(this._vertexBuffers, this._indexBuffer, effect);
 
                     // Draw order
-                    engine.draw(true, 0, 6);
+                    engine.drawElementsType(Material.TriangleFillMode, 0, 6);
 
                     pp.onAfterRenderObservable.notifyObservers(effect);
                 }
@@ -106,6 +125,14 @@
             engine.setDepthWrite(true);
         }
 
+        /**
+         * Finalize the result of the output of the postprocesses.
+         * @param doNotPresent If true the result will not be displayed to the screen.
+         * @param targetTexture The target texture to render to.
+         * @param faceIndex The index of the face to bind the target texture to.
+         * @param postProcesses The array of post processes to render.
+         * @param forceFullscreenViewport force gl.viewport to be full screen eg. 0,0,textureWidth,textureHeight (default: false)
+         */
         public _finalizeFrame(doNotPresent?: boolean, targetTexture?: InternalTexture, faceIndex?: number, postProcesses?: PostProcess[], forceFullscreenViewport = false): void {
             let camera = this._scene.activeCamera;
 
@@ -145,7 +172,7 @@
                     engine.bindBuffers(this._vertexBuffers, this._indexBuffer, effect);
 
                     // Draw order
-                    engine.draw(true, 0, 6);
+                    engine.drawElementsType(Material.TriangleFillMode, 0, 6);
 
                     pp.onAfterRenderObservable.notifyObservers(effect);
                 }
@@ -157,6 +184,9 @@
             engine.setAlphaMode(Engine.ALPHA_DISABLE);
         }
 
+        /**
+         * Disposes of the post process manager.
+         */
         public dispose(): void {
             var buffer = this._vertexBuffers[VertexBuffer.PositionKind];
             if (buffer) {

@@ -1,3 +1,4 @@
+import { mapperManager } from './configuration/mappers';
 import { viewerManager } from './viewer/viewerManager';
 import { DefaultViewer } from './viewer/defaultViewer';
 import { AbstractViewer } from './viewer/viewer';
@@ -12,19 +13,20 @@ import { AbstractViewer } from './viewer/viewer';
 // load babylon and needed modules.
 import 'babylonjs';
 import 'babylonjs-loaders';
-import 'babylonjs-materials';
+import '../assets/pep.min';
+
+import { PromisePolyfill } from 'babylonjs';
 
 import { InitTags } from './initializer';
 
 // promise polyfill, if needed!
-global.Promise = Promise || require('es6-promise').Promise;
+PromisePolyfill.Apply();
 
 export let disableInit: boolean = false;
-
-setTimeout(() => {
+document.addEventListener("DOMContentLoaded", function (event) {
     if (disableInit) return;
     InitTags();
 });
 
 // public API for initialization
-export { InitTags, DefaultViewer, AbstractViewer, viewerManager };
+export { InitTags, DefaultViewer, AbstractViewer, viewerManager, mapperManager };

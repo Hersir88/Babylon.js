@@ -2,6 +2,7 @@ module BABYLON {
     /**
      * Interface to follow in your material defines to integrate easily the
      * Image proccessing functions.
+     * @ignore
      */
     export interface IImageProcessingConfigurationDefines {
         IMAGEPROCESSING: boolean;
@@ -17,6 +18,10 @@ module BABYLON {
         SAMPLER3DGREENDEPTH: boolean;
         SAMPLER3DBGRMAP: boolean;
         IMAGEPROCESSINGPOSTPROCESS: boolean;
+        /** 
+         * If the grain should be performed in the image processing shader.
+         */
+        GRAIN: boolean;
     }
 
     /**
@@ -207,13 +212,64 @@ module BABYLON {
          * if vignetteEnabled is set to true.
          */
         @serializeAsColor4()
-        public vignetteColor: BABYLON.Color4 = new BABYLON.Color4(0, 0, 0, 0);
+        public vignetteColor: Color4 = new Color4(0, 0, 0, 0);
 
         /**
          * Camera field of view used by the Vignette effect.
          */
         @serialize()
         public vignetteCameraFov = 0.5;
+
+        @serialize()
+        private _grainEnabled = false;
+
+        /**
+         * If the grain effect should be enabled.
+         */
+        public get grainEnabled(): boolean {
+            return this._grainEnabled;
+        }
+        public set grainEnabled(value: boolean) {
+            if (this._grainEnabled === value) {
+                return;
+            }
+
+            this._grainEnabled = value;
+            this._updateParameters();
+        }
+
+        @serialize()
+        private _grainIntensity = 30;
+        /**
+         * Amount of grain to be applied by the grain effect.
+         */
+        public get grainIntensity(): number {
+            return this._grainIntensity;
+        }
+        public set grainIntensity(value: number) {
+            if (this._grainIntensity === value) {
+                return;
+            }
+            this._grainIntensity = value;
+        }
+
+        @serialize()
+        private _grainAnimated = false;
+
+        /**
+         * If the grain effect should be animated.
+         */
+        public get grainAnimated(): boolean {
+            return this._grainAnimated;
+        }
+        public set grainAnimated(value: boolean) {
+            if (this._grainAnimated === value) {
+                return;
+            }
+
+            this._grainAnimated = value;
+            this._updateParameters();
+        }
 
         @serialize()
         private _vignetteBlendMode = ImageProcessingConfiguration.VIGNETTEMODE_MULTIPLY;
@@ -275,6 +331,26 @@ module BABYLON {
             this._updateParameters();
         }
 
+        @serialize()
+        private _isEnabled = true;
+        /**
+         * Gets wether the image processing is enabled or not.
+         */
+        public get isEnabled(): boolean {
+            return this._isEnabled;
+        }
+        /**
+         * Sets wether the image processing is enabled or not.
+         */
+        public set isEnabled(value: boolean) {
+            if (this._isEnabled === value) {
+                return;
+            }
+
+            this._isEnabled = value;
+            this._updateParameters();
+        }
+
         /**
         * An event triggered when the configuration changes and requires Shader to Update some parameters.
         * @type {BABYLON.Observable}
@@ -290,7 +366,7 @@ module BABYLON {
 
         public getClassName(): string {
             return "ImageProcessingConfiguration";
-        }                 
+        }
 
         /**
          * Prepare the list of uniforms associated with the Image Processing effects.
@@ -315,6 +391,10 @@ module BABYLON {
             if (defines.COLORCURVES) {
                 ColorCurves.PrepareUniforms(uniforms);
             }
+            if (defines.GRAIN){
+                uniforms.push("grainVarianceAmount");
+                uniforms.push("grainAnimatedSeed");
+            }
         }
 
         /**
@@ -333,7 +413,7 @@ module BABYLON {
          * @param defines the list of defines to complete
          */
         public prepareDefines(defines: IImageProcessingConfigurationDefines, forPostProcess: boolean = false): void {
-            if (forPostProcess !== this.applyByPostProcess) {
+            if (forPostProcess !== this.applyByPostProcess || !this._isEnabled) {
                 defines.VIGNETTE = false;
                 defines.TONEMAPPING = false;
                 defines.CONTRAST = false;
@@ -342,7 +422,7 @@ module BABYLON {
                 defines.COLORGRADING = false;
                 defines.COLORGRADING3D = false;
                 defines.IMAGEPROCESSING = false;
-                defines.IMAGEPROCESSINGPOSTPROCESS = this.applyByPostProcess;
+                defines.IMAGEPROCESSINGPOSTPROCESS = this.applyByPostProcess && this._isEnabled;
                 return;
             }
 
@@ -362,7 +442,8 @@ module BABYLON {
             defines.SAMPLER3DGREENDEPTH = this.colorGradingWithGreenDepth;
             defines.SAMPLER3DBGRMAP = this.colorGradingBGR;
             defines.IMAGEPROCESSINGPOSTPROCESS = this.applyByPostProcess;
-            defines.IMAGEPROCESSING = defines.VIGNETTE || defines.TONEMAPPING || defines.CONTRAST || defines.EXPOSURE || defines.COLORCURVES || defines.COLORGRADING;
+            defines.GRAIN = this.grainEnabled;
+            defines.IMAGEPROCESSING = defines.VIGNETTE || defines.TONEMAPPING || defines.CONTRAST || defines.EXPOSURE || defines.COLORCURVES || defines.COLORGRADING || defines.GRAIN;
         }
 
         /**
@@ -377,7 +458,7 @@ module BABYLON {
          * Binds the image processing to the shader.
          * @param effect The effect to bind to
          */
-        public bind(effect: Effect, aspectRatio = 1) : void {
+        public bind(effect: Effect, aspectRatio = 1): void {
             // Color Curves
             if (this._colorCurvesEnabled && this.colorCurves) {
                 ColorCurves.Bind(this.colorCurves, effect);
@@ -404,10 +485,10 @@ module BABYLON {
 
             // Exposure
             effect.setFloat("exposureLinear", this.exposure);
-            
+
             // Contrast
             effect.setFloat("contrast", this.contrast);
-            
+
             // Color transform settings
             if (this.colorGradingTexture) {
                 effect.setTexture("txColorTransform", this.colorGradingTexture);
@@ -420,6 +501,9 @@ module BABYLON {
                     this.colorGradingTexture.level // weight
                 );
             }
+
+            effect.setFloat("grainVarianceAmount", this.grainIntensity);
+            effect.setFloat("grainAnimatedSeed", this.grainAnimated ? Math.random() + 1 : 1);
         }
 
         /**
@@ -442,8 +526,8 @@ module BABYLON {
          * Parses the image processing from a json representation.
          * @param source the JSON source to parse
          * @return The parsed image processing
-         */      
-        public static Parse(source: any) : ImageProcessingConfiguration {
+         */
+        public static Parse(source: any): ImageProcessingConfiguration {
             return SerializationHelper.Parse(() => new ImageProcessingConfiguration(), source, null, null);
         }
 

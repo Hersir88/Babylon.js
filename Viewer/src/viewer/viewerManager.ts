@@ -1,7 +1,9 @@
+/// <reference path="../../../dist/preview release/babylon.d.ts"/>
+
 import { Observable } from 'babylonjs';
 import { AbstractViewer } from './viewer';
 
-class ViewerManager {
+export class ViewerManager {
 
     private viewers: { [key: string]: AbstractViewer };
 
@@ -32,6 +34,10 @@ class ViewerManager {
 
     public getViewerPromiseById(id: string): Promise<AbstractViewer> {
         return new Promise((resolve, reject) => {
+            let localViewer = this.getViewerById(id)
+            if (localViewer) {
+                return resolve(localViewer);
+            }
             let viewerFunction = (viewer: AbstractViewer) => {
                 if (viewer.getBaseId() === id) {
                     resolve(viewer);

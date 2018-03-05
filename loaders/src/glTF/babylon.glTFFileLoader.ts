@@ -2,15 +2,32 @@
 
 module BABYLON {
     export enum GLTFLoaderCoordinateSystemMode {
-        // Automatically convert the glTF right-handed data to the appropriate system based on the current coordinate system mode of the scene (scene.useRightHandedSystem).
-        // NOTE: When scene.useRightHandedSystem is false, an additional transform will be added to the root to transform the data from right-handed to left-handed.
+        /**
+         * Automatically convert the glTF right-handed data to the appropriate system based on the current coordinate system mode of the scene.
+         */
         AUTO,
 
-        // The glTF right-handed data is not transformed in any form and is loaded directly.
-        PASS_THROUGH,
-
-        // Sets the useRightHandedSystem flag on the scene.
+        /**
+         * Sets the useRightHandedSystem flag on the scene.
+         */
         FORCE_RIGHT_HANDED,
+    }
+
+    export enum GLTFLoaderAnimationStartMode {
+        /**
+         * No animation will start.
+         */
+        NONE,
+
+        /**
+         * The first animation will start.
+         */
+        FIRST,
+
+        /**
+         * All animations will start.
+         */
+        ALL,
     }
 
     export interface IGLTFLoaderData {
@@ -18,39 +35,219 @@ module BABYLON {
         bin: Nullable<ArrayBufferView>;
     }
 
+    export interface IGLTFLoaderExtension {
+        /**
+         * The name of this extension.
+         */
+        readonly name: string;
+
+        /**
+         * Whether this extension is enabled.
+         */
+        enabled: boolean;
+    }
+
+    export enum GLTFLoaderState {
+        Loading,
+        Ready,
+        Complete
+    }
+
     export interface IGLTFLoader extends IDisposable {
-        importMeshAsync: (meshesNames: any, scene: Scene, data: IGLTFLoaderData, rootUrl: string, onSuccess: (meshes: AbstractMesh[], particleSystems: ParticleSystem[], skeletons: Skeleton[]) => void, onProgress: (event: ProgressEvent) => void, onError: (message: string) => void) => void;
-        loadAsync: (scene: Scene, data: IGLTFLoaderData, rootUrl: string, onSuccess: () => void, onProgress: (event: ProgressEvent) => void, onError: (message: string) => void) => void;
+        coordinateSystemMode: GLTFLoaderCoordinateSystemMode;
+        animationStartMode: GLTFLoaderAnimationStartMode;
+        compileMaterials: boolean;
+        useClipPlane: boolean;
+        compileShadowGenerators: boolean;
+
+        onMeshLoadedObservable: Observable<AbstractMesh>;
+        onTextureLoadedObservable: Observable<BaseTexture>;
+        onMaterialLoadedObservable: Observable<Material>;
+        onAnimationGroupLoadedObservable: Observable<AnimationGroup>;
+        onCompleteObservable: Observable<IGLTFLoader>;
+        onDisposeObservable: Observable<IGLTFLoader>;
+        onExtensionLoadedObservable: Observable<IGLTFLoaderExtension>;
+
+        state: Nullable<GLTFLoaderState>;
+
+        importMeshAsync: (meshesNames: any, scene: Scene, data: IGLTFLoaderData, rootUrl: string, onProgress?: (event: SceneLoaderProgressEvent) => void) => Promise<{ meshes: AbstractMesh[], particleSystems: ParticleSystem[], skeletons: Skeleton[] }>;
+        loadAsync: (scene: Scene, data: IGLTFLoaderData, rootUrl: string, onProgress?: (event: SceneLoaderProgressEvent) => void) => Promise<void>;
     }
 
     export class GLTFFileLoader implements IDisposable, ISceneLoaderPluginAsync, ISceneLoaderPluginFactory {
-        public static CreateGLTFLoaderV1: (parent: GLTFFileLoader) => IGLTFLoader;
-        public static CreateGLTFLoaderV2: (parent: GLTFFileLoader) => IGLTFLoader;
+        public static CreateGLTFLoaderV1: () => IGLTFLoader;
+        public static CreateGLTFLoaderV2: () => IGLTFLoader;
 
-        // Common options
-        public onParsed: (data: IGLTFLoaderData) => void;
-
-        // V1 options
-        public static HomogeneousCoordinates = false;
-        public static IncrementalLoading = true;
-
-        // V2 options
-        public coordinateSystemMode = GLTFLoaderCoordinateSystemMode.AUTO;
-        public compileMaterials = false;
-        public compileShadowGenerators = false;
-        public useClipPlane = false;
-        public onMeshLoaded: (mesh: AbstractMesh) => void;
-        public onTextureLoaded: (texture: BaseTexture) => void;
-        public onMaterialLoaded: (material: Material) => void;
+        // #region Common options
 
         /**
-         * Raised when the asset is completely loaded, just before the loader is disposed.
-         * For assets with LODs, raised when all of the LODs are complete.
-         * For assets without LODs, raised when the model is complete just after onSuccess.
+         * Raised when the asset has been parsed.
+         * The data.json property stores the glTF JSON.
+         * The data.bin property stores the BIN chunk from a glTF binary or null if the input is not a glTF binary.
          */
-        public onComplete: () => void;
+        public onParsedObservable = new Observable<IGLTFLoaderData>();
 
-        private _loader: IGLTFLoader;
+        private _onParsedObserver: Nullable<Observer<IGLTFLoaderData>>;
+        public set onParsed(callback: (loaderData: IGLTFLoaderData) => void) {
+            if (this._onParsedObserver) {
+                this.onParsedObservable.remove(this._onParsedObserver);
+            }
+            this._onParsedObserver = this.onParsedObservable.add(callback);
+        }
+
+        // #endregion
+
+        // #region V1 options
+
+        public static IncrementalLoading = true;
+
+        public static HomogeneousCoordinates = false;
+
+        // #endregion
+
+        // #region V2 options
+
+        /**
+         * The coordinate system mode (AUTO, FORCE_RIGHT_HANDED).
+         */
+        public coordinateSystemMode = GLTFLoaderCoordinateSystemMode.AUTO;
+
+        /**
+         * The animation start mode (NONE, FIRST, ALL).
+         */
+        public animationStartMode = GLTFLoaderAnimationStartMode.FIRST;
+
+        /**
+         * Set to true to compile materials before raising the success callback.
+         */
+        public compileMaterials = false;
+
+        /**
+         * Set to true to also compile materials with clip planes.
+         */
+        public useClipPlane = false;
+
+        /**
+         * Set to true to compile shadow generators before raising the success callback.
+         */
+        public compileShadowGenerators = false;
+
+        /**
+         * Raised when the loader creates a mesh after parsing the glTF properties of the mesh.
+         */
+        public readonly onMeshLoadedObservable = new Observable<AbstractMesh>();
+
+        private _onMeshLoadedObserver: Nullable<Observer<AbstractMesh>>;
+        public set onMeshLoaded(callback: (mesh: AbstractMesh) => void) {
+            if (this._onMeshLoadedObserver) {
+                this.onMeshLoadedObservable.remove(this._onMeshLoadedObserver);
+            }
+            this._onMeshLoadedObserver = this.onMeshLoadedObservable.add(callback);
+        }
+
+        /**
+         * Raised when the loader creates a texture after parsing the glTF properties of the texture.
+         */
+        public readonly onTextureLoadedObservable = new Observable<BaseTexture>();
+
+        private _onTextureLoadedObserver: Nullable<Observer<BaseTexture>>;
+        public set onTextureLoaded(callback: (texture: BaseTexture) => void) {
+            if (this._onTextureLoadedObserver) {
+                this.onTextureLoadedObservable.remove(this._onTextureLoadedObserver);
+            }
+            this._onTextureLoadedObserver = this.onTextureLoadedObservable.add(callback);
+        }
+
+        /**
+         * Raised when the loader creates a material after parsing the glTF properties of the material.
+         */
+        public readonly onMaterialLoadedObservable = new Observable<Material>();
+
+        private _onMaterialLoadedObserver: Nullable<Observer<Material>>;
+        public set onMaterialLoaded(callback: (material: Material) => void) {
+            if (this._onMaterialLoadedObserver) {
+                this.onMaterialLoadedObservable.remove(this._onMaterialLoadedObserver);
+            }
+            this._onMaterialLoadedObserver = this.onMaterialLoadedObservable.add(callback);
+        }
+
+        /**
+         * Raised when the loader creates an animation group after parsing the glTF properties of the animation.
+         */
+        public readonly onAnimationGroupLoadedObservable = new Observable<AnimationGroup>();
+
+        private _onAnimationGroupLoadedObserver: Nullable<Observer<AnimationGroup>>;
+        public set onAnimationGroupLoaded(callback: (animationGroup: AnimationGroup) => void) {
+            if (this._onAnimationGroupLoadedObserver) {
+                this.onAnimationGroupLoadedObservable.remove(this._onAnimationGroupLoadedObserver);
+            }
+            this._onAnimationGroupLoadedObserver = this.onAnimationGroupLoadedObservable.add(callback);
+        }
+
+        /**
+         * Raised when the asset is completely loaded, immediately before the loader is disposed.
+         * For assets with LODs, raised when all of the LODs are complete.
+         * For assets without LODs, raised when the model is complete, immediately after onSuccess.
+         */
+        public readonly onCompleteObservable = new Observable<GLTFFileLoader>();
+
+        private _onCompleteObserver: Nullable<Observer<GLTFFileLoader>>;
+        public set onComplete(callback: () => void) {
+            if (this._onCompleteObserver) {
+                this.onCompleteObservable.remove(this._onCompleteObserver);
+            }
+            this._onCompleteObserver = this.onCompleteObservable.add(callback);
+        }
+
+        /**
+        * Raised when the loader is disposed.
+        */
+        public readonly onDisposeObservable = new Observable<GLTFFileLoader>();
+
+        private _onDisposeObserver: Nullable<Observer<GLTFFileLoader>>;
+        public set onDispose(callback: () => void) {
+            if (this._onDisposeObserver) {
+                this.onDisposeObservable.remove(this._onDisposeObserver);
+            }
+            this._onDisposeObserver = this.onDisposeObservable.add(callback);
+        }
+
+        /**
+         * Raised after a loader extension is created.
+         * Set additional options for a loader extension in this event.
+         */
+        public readonly onExtensionLoadedObservable = new Observable<IGLTFLoaderExtension>();
+
+        private _onExtensionLoadedObserver: Nullable<Observer<IGLTFLoaderExtension>>;
+        public set onExtensionLoaded(callback: (extension: IGLTFLoaderExtension) => void) {
+            if (this._onExtensionLoadedObserver) {
+                this.onExtensionLoadedObservable.remove(this._onExtensionLoadedObserver);
+            }
+            this._onExtensionLoadedObserver = this.onExtensionLoadedObservable.add(callback);
+        }
+
+        /**
+         * Gets a promise that resolves when the asset is completely loaded.
+         * @returns A promise that resolves when the asset is completely loaded.
+         */
+        public whenCompleteAsync(): Promise<void> {
+            return new Promise(resolve => {
+                this.onCompleteObservable.add(() => {
+                    resolve();
+                }, undefined, undefined, undefined, true);
+            });
+        }
+
+        /**
+         * The loader state or null if not active.
+         */
+        public get loaderState(): Nullable<GLTFLoaderState> {
+            return this._loader ? this._loader.state : null;
+        }
+
+        // #endregion
+
+        private _loader: Nullable<IGLTFLoader> = null;
 
         public name = "gltf";
 
@@ -59,42 +256,52 @@ module BABYLON {
             ".glb": { isBinary: true }
         };
 
+        /**
+         * Disposes the loader, releases resources during load, and cancels any outstanding requests.
+         */
         public dispose(): void {
             if (this._loader) {
                 this._loader.dispose();
+                this._loader = null;
             }
+
+            this.onMeshLoadedObservable.clear();
+            this.onTextureLoadedObservable.clear();
+            this.onMaterialLoadedObservable.clear();
+
+            this.onDisposeObservable.notifyObservers(this);
+            this.onDisposeObservable.clear();
         }
 
-        public importMeshAsync(meshesNames: any, scene: Scene, data: any, rootUrl: string, onSuccess: (meshes: AbstractMesh[], particleSystems: ParticleSystem[], skeletons: Skeleton[]) => void, onProgress: (event: ProgressEvent) => void, onError: (message: string) => void): void {
-            try {
-                const loaderData = GLTFFileLoader._parse(data);
-
-                if (this.onParsed) {
-                    this.onParsed(loaderData);
-                }
-
+        public importMeshAsync(meshesNames: any, scene: Scene, data: any, rootUrl: string, onProgress?: (event: SceneLoaderProgressEvent) => void): Promise<{ meshes: AbstractMesh[], particleSystems: ParticleSystem[], skeletons: Skeleton[] }> {
+            return Promise.resolve().then(() => {
+                const loaderData = this._parse(data);
                 this._loader = this._getLoader(loaderData);
-                this._loader.importMeshAsync(meshesNames, scene, loaderData, rootUrl, onSuccess, onProgress, onError);
-            }
-            catch (e) {
-                onError(e.message);
-            }
+                return this._loader.importMeshAsync(meshesNames, scene, loaderData, rootUrl, onProgress);
+            });
         }
 
-        public loadAsync(scene: Scene, data: string | ArrayBuffer, rootUrl: string, onSuccess: () => void, onProgress: (event: ProgressEvent) => void, onError: (message: string) => void): void {
-            try {
-                const loaderData = GLTFFileLoader._parse(data);
-
-                if (this.onParsed) {
-                    this.onParsed(loaderData);
-                }
-
+        public loadAsync(scene: Scene, data: string | ArrayBuffer, rootUrl: string, onProgress?: (event: SceneLoaderProgressEvent) => void): Promise<void> {
+            return Promise.resolve().then(() => {
+                const loaderData = this._parse(data);
                 this._loader = this._getLoader(loaderData);
-                this._loader.loadAsync(scene, loaderData, rootUrl, onSuccess, onProgress, onError);
-            }
-            catch (e) {
-                onError(e.message);
-            }
+                return this._loader.loadAsync(scene, loaderData, rootUrl, onProgress);
+            });
+        }
+
+        public loadAssetContainerAsync(scene: Scene, data: string | ArrayBuffer, rootUrl: string, onProgress?: (event: SceneLoaderProgressEvent) => void): Promise<AssetContainer> {
+            return Promise.resolve().then(() => {
+                const loaderData = this._parse(data);
+                this._loader = this._getLoader(loaderData);
+                return this._loader.importMeshAsync(null, scene, loaderData, rootUrl, onProgress).then(result => {
+                    var container = new AssetContainer(scene);
+                    Array.prototype.push.apply(container.meshes, result.meshes);
+                    Array.prototype.push.apply(container.particleSystems, result.particleSystems);
+                    Array.prototype.push.apply(container.skeletons, result.skeletons);
+                    container.removeAllFromScene();
+                    return container;
+                });
+            });
         }
 
         public canDirectLoad(data: string): boolean {
@@ -107,15 +314,22 @@ module BABYLON {
             return new GLTFFileLoader();
         }
 
-        private static _parse(data: string | ArrayBuffer): IGLTFLoaderData {
+        private _parse(data: string | ArrayBuffer): IGLTFLoaderData {
+            let parsedData: IGLTFLoaderData;
             if (data instanceof ArrayBuffer) {
-                return GLTFFileLoader._parseBinary(data);
+                parsedData = GLTFFileLoader._parseBinary(data);
+            }
+            else {
+                parsedData = {
+                    json: JSON.parse(data),
+                    bin: null
+                };
             }
 
-            return {
-                json: JSON.parse(data),
-                bin: null
-            };
+            this.onParsedObservable.notifyObservers(parsedData);
+            this.onParsedObservable.clear();
+
+            return parsedData;
         }
 
         private _getLoader(loaderData: IGLTFLoaderData): IGLTFLoader {
@@ -139,7 +353,7 @@ module BABYLON {
                 }
             }
 
-            const createLoaders: { [key: number]: (parent: GLTFFileLoader) => IGLTFLoader } = {
+            const createLoaders: { [key: number]: () => IGLTFLoader } = {
                 1: GLTFFileLoader.CreateGLTFLoaderV1,
                 2: GLTFFileLoader.CreateGLTFLoaderV2
             };
@@ -149,7 +363,27 @@ module BABYLON {
                 throw new Error("Unsupported version: " + asset.version);
             }
 
-            return createLoader(this);
+            const loader = createLoader();
+            loader.coordinateSystemMode = this.coordinateSystemMode;
+            loader.animationStartMode = this.animationStartMode;
+            loader.compileMaterials = this.compileMaterials;
+            loader.useClipPlane = this.useClipPlane;
+            loader.compileShadowGenerators = this.compileShadowGenerators;
+            loader.onMeshLoadedObservable.add(mesh => this.onMeshLoadedObservable.notifyObservers(mesh));
+            loader.onTextureLoadedObservable.add(texture => this.onTextureLoadedObservable.notifyObservers(texture));
+            loader.onMaterialLoadedObservable.add(material => this.onMaterialLoadedObservable.notifyObservers(material));
+            loader.onExtensionLoadedObservable.add(extension => this.onExtensionLoadedObservable.notifyObservers(extension));
+
+            loader.onCompleteObservable.add(() => {
+                this.onMeshLoadedObservable.clear();
+                this.onTextureLoadedObservable.clear();
+                this.onMaterialLoadedObservable.clear();
+
+                this.onCompleteObservable.notifyObservers(this);
+                this.onCompleteObservable.clear();
+            });
+
+            return loader;
         }
 
         private static _parseBinary(data: ArrayBuffer): IGLTFLoaderData {
@@ -253,7 +487,14 @@ module BABYLON {
         }
 
         private static _parseVersion(version: string): Nullable<{ major: number, minor: number }> {
-            const match = (version + "").match(/^(\d+)\.(\d+)$/);
+            if (version === "1.0" || version === "1.0.1") {
+                return {
+                    major: 1,
+                    minor: 0
+                };
+            }
+
+            const match = (version + "").match(/^(\d+)\.(\d+)/);
             if (!match) {
                 return null;
             }

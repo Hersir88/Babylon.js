@@ -73,6 +73,7 @@ declare module BABYLON {
         SAMPLER3DBGRMAP: boolean;
         IMAGEPROCESSINGPOSTPROCESS: boolean;
         EXPOSURE: boolean;
+        GRAIN: boolean;
         constructor();
         setReflectionMode(modeToEnable: string): void;
     }
@@ -222,6 +223,7 @@ declare module BABYLON {
          * Sets the Color Grading 2D Lookup Texture.
          */
         cameraColorGradingTexture: Nullable<BaseTexture>;
+        protected _shouldTurnAlphaTestOn(mesh: AbstractMesh): boolean;
         customShaderNameResolve: (shaderName: string, uniforms: string[], uniformBuffers: string[], samplers: string[], defines: StandardMaterialDefines_OldVer) => string;
         protected _renderTargets: SmartArray<RenderTargetTexture>;
         protected _worldViewProjectionMatrix: Matrix;

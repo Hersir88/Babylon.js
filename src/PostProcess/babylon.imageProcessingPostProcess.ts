@@ -55,7 +55,7 @@
                     scene = scenes[scenes.length - 1];
                 }
                 else {
-                    scene = BABYLON.Engine.LastCreatedScene;
+                    scene = Engine.LastCreatedScene;
                 }
 
                 this._imageProcessingConfiguration = (<Scene>scene).imageProcessingConfiguration;
@@ -272,6 +272,45 @@
             this.imageProcessingConfiguration.vignetteEnabled = value;
         }
 
+        /**
+         * Gets wether the grain effect is enabled.
+         */
+        public get grainEnabled(): boolean {
+            return this.imageProcessingConfiguration.grainEnabled;
+        }
+        /**
+         * Sets wether the grain effect is enabled.
+         */
+        public set grainEnabled(value: boolean) {
+            this.imageProcessingConfiguration.grainEnabled = value;
+        }
+
+        /**
+         * Gets the grain effect's intensity.
+         */
+        public get grainIntensity(): number {
+            return this.imageProcessingConfiguration.grainIntensity;
+        }
+        /**
+         * Sets the grain effect's intensity.
+         */
+        public set grainIntensity(value: number) {
+            this.imageProcessingConfiguration.grainIntensity = value;
+        }
+
+        /**
+         * Gets wether the grain effect is animated.
+         */
+        public get grainAnimated(): boolean {
+            return this.imageProcessingConfiguration.grainAnimated;
+        }
+        /**
+         * Sets wether the grain effect is animated.
+         */
+        public set grainAnimated(value: boolean) {
+            this.imageProcessingConfiguration.grainAnimated = value;
+        }
+
         @serialize()
         private _fromLinearSpace = true;
         /**
@@ -310,16 +349,26 @@
             SAMPLER3DBGRMAP: false,
             IMAGEPROCESSINGPOSTPROCESS: false,
             EXPOSURE: false,
+            GRAIN: false,
         }
 
-        constructor(name: string, options: number | PostProcessOptions, camera: Nullable<Camera> = null, samplingMode?: number, engine?: Engine, reusable?: boolean, textureType: number = Engine.TEXTURETYPE_UNSIGNED_INT) {
+        constructor(name: string, options: number | PostProcessOptions, camera: Nullable<Camera> = null, samplingMode?: number, engine?: Engine, reusable?: boolean, textureType: number = Engine.TEXTURETYPE_UNSIGNED_INT, imageProcessingConfiguration?: ImageProcessingConfiguration) {
             super(name, "imageProcessing", [], [], options, camera, samplingMode, engine, reusable,
-                                            null, textureType, "postprocess", null, true);
+                null, textureType, "postprocess", null, true);
 
+            // Setup the configuration as forced by the constructor. This would then not force the 
+            // scene materials output in linear space and let untouched the default forward pass.
+            if (imageProcessingConfiguration) {
+                imageProcessingConfiguration.applyByPostProcess = true;
+                this._attachImageProcessingConfiguration(imageProcessingConfiguration, true);
+                // This will cause the shader to be compiled
+                this.fromLinearSpace = false;
+            }
             // Setup the default processing configuration to the scene.
-            this._attachImageProcessingConfiguration(null, true);
-
-            this.imageProcessingConfiguration.applyByPostProcess = true;
+            else {
+                this._attachImageProcessingConfiguration(null, true);
+                this.imageProcessingConfiguration.applyByPostProcess = true;
+            }
 
             this.onApply = (effect: Effect) => {
                 this.imageProcessingConfiguration.bind(effect, this.aspectRatio);
@@ -328,7 +377,7 @@
 
         public getClassName(): string {
             return "ImageProcessingPostProcess";
-        }           
+        }
 
         protected _updateParameters(): void {
             this._defines.FROMLINEARSPACE = this._fromLinearSpace;
@@ -355,7 +404,7 @@
             if (this._imageProcessingConfiguration && this._imageProcessingObserver) {
                 this._imageProcessingConfiguration.onUpdateParameters.remove(this._imageProcessingObserver);
             }
-            
+
             this.imageProcessingConfiguration.applyByPostProcess = false;
         }
     }

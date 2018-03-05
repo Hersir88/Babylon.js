@@ -1,47 +1,174 @@
 
 declare module BABYLON {
     enum GLTFLoaderCoordinateSystemMode {
+        /**
+         * Automatically convert the glTF right-handed data to the appropriate system based on the current coordinate system mode of the scene.
+         */
         AUTO = 0,
-        PASS_THROUGH = 1,
-        FORCE_RIGHT_HANDED = 2,
+        /**
+         * Sets the useRightHandedSystem flag on the scene.
+         */
+        FORCE_RIGHT_HANDED = 1,
+    }
+    enum GLTFLoaderAnimationStartMode {
+        /**
+         * No animation will start.
+         */
+        NONE = 0,
+        /**
+         * The first animation will start.
+         */
+        FIRST = 1,
+        /**
+         * All animations will start.
+         */
+        ALL = 2,
     }
     interface IGLTFLoaderData {
         json: Object;
         bin: Nullable<ArrayBufferView>;
     }
+    interface IGLTFLoaderExtension {
+        /**
+         * The name of this extension.
+         */
+        readonly name: string;
+        /**
+         * Whether this extension is enabled.
+         */
+        enabled: boolean;
+    }
+    enum GLTFLoaderState {
+        Loading = 0,
+        Ready = 1,
+        Complete = 2,
+    }
     interface IGLTFLoader extends IDisposable {
-        importMeshAsync: (meshesNames: any, scene: Scene, data: IGLTFLoaderData, rootUrl: string, onSuccess: (meshes: AbstractMesh[], particleSystems: ParticleSystem[], skeletons: Skeleton[]) => void, onProgress: (event: ProgressEvent) => void, onError: (message: string) => void) => void;
-        loadAsync: (scene: Scene, data: IGLTFLoaderData, rootUrl: string, onSuccess: () => void, onProgress: (event: ProgressEvent) => void, onError: (message: string) => void) => void;
+        coordinateSystemMode: GLTFLoaderCoordinateSystemMode;
+        animationStartMode: GLTFLoaderAnimationStartMode;
+        compileMaterials: boolean;
+        useClipPlane: boolean;
+        compileShadowGenerators: boolean;
+        onMeshLoadedObservable: Observable<AbstractMesh>;
+        onTextureLoadedObservable: Observable<BaseTexture>;
+        onMaterialLoadedObservable: Observable<Material>;
+        onAnimationGroupLoadedObservable: Observable<AnimationGroup>;
+        onCompleteObservable: Observable<IGLTFLoader>;
+        onDisposeObservable: Observable<IGLTFLoader>;
+        onExtensionLoadedObservable: Observable<IGLTFLoaderExtension>;
+        state: Nullable<GLTFLoaderState>;
+        importMeshAsync: (meshesNames: any, scene: Scene, data: IGLTFLoaderData, rootUrl: string, onProgress?: (event: SceneLoaderProgressEvent) => void) => Promise<{
+            meshes: AbstractMesh[];
+            particleSystems: ParticleSystem[];
+            skeletons: Skeleton[];
+        }>;
+        loadAsync: (scene: Scene, data: IGLTFLoaderData, rootUrl: string, onProgress?: (event: SceneLoaderProgressEvent) => void) => Promise<void>;
     }
     class GLTFFileLoader implements IDisposable, ISceneLoaderPluginAsync, ISceneLoaderPluginFactory {
-        static CreateGLTFLoaderV1: (parent: GLTFFileLoader) => IGLTFLoader;
-        static CreateGLTFLoaderV2: (parent: GLTFFileLoader) => IGLTFLoader;
-        onParsed: (data: IGLTFLoaderData) => void;
-        static HomogeneousCoordinates: boolean;
+        static CreateGLTFLoaderV1: () => IGLTFLoader;
+        static CreateGLTFLoaderV2: () => IGLTFLoader;
+        /**
+         * Raised when the asset has been parsed.
+         * The data.json property stores the glTF JSON.
+         * The data.bin property stores the BIN chunk from a glTF binary or null if the input is not a glTF binary.
+         */
+        onParsedObservable: Observable<IGLTFLoaderData>;
+        private _onParsedObserver;
+        onParsed: (loaderData: IGLTFLoaderData) => void;
         static IncrementalLoading: boolean;
+        static HomogeneousCoordinates: boolean;
+        /**
+         * The coordinate system mode (AUTO, FORCE_RIGHT_HANDED).
+         */
         coordinateSystemMode: GLTFLoaderCoordinateSystemMode;
+        /**
+         * The animation start mode (NONE, FIRST, ALL).
+         */
+        animationStartMode: GLTFLoaderAnimationStartMode;
+        /**
+         * Set to true to compile materials before raising the success callback.
+         */
         compileMaterials: boolean;
-        compileShadowGenerators: boolean;
+        /**
+         * Set to true to also compile materials with clip planes.
+         */
         useClipPlane: boolean;
+        /**
+         * Set to true to compile shadow generators before raising the success callback.
+         */
+        compileShadowGenerators: boolean;
+        /**
+         * Raised when the loader creates a mesh after parsing the glTF properties of the mesh.
+         */
+        readonly onMeshLoadedObservable: Observable<AbstractMesh>;
+        private _onMeshLoadedObserver;
         onMeshLoaded: (mesh: AbstractMesh) => void;
+        /**
+         * Raised when the loader creates a texture after parsing the glTF properties of the texture.
+         */
+        readonly onTextureLoadedObservable: Observable<BaseTexture>;
+        private _onTextureLoadedObserver;
         onTextureLoaded: (texture: BaseTexture) => void;
+        /**
+         * Raised when the loader creates a material after parsing the glTF properties of the material.
+         */
+        readonly onMaterialLoadedObservable: Observable<Material>;
+        private _onMaterialLoadedObserver;
         onMaterialLoaded: (material: Material) => void;
         /**
-         * Raised when the asset is completely loaded, just before the loader is disposed.
-         * For assets with LODs, raised when all of the LODs are complete.
-         * For assets without LODs, raised when the model is complete just after onSuccess.
+         * Raised when the loader creates an animation group after parsing the glTF properties of the material.
          */
+        readonly onAnimationGroupLoadedObservable: Observable<AnimationGroup>;
+        private _onAnimationGroupLoadedObserver;
+        onAnimationGroupLoaded: (animationGroup: AnimationGroup) => void;
+        /**
+         * Raised when the asset is completely loaded, immediately before the loader is disposed.
+         * For assets with LODs, raised when all of the LODs are complete.
+         * For assets without LODs, raised when the model is complete, immediately after onSuccess.
+         */
+        readonly onCompleteObservable: Observable<GLTFFileLoader>;
+        private _onCompleteObserver;
         onComplete: () => void;
+        /**
+        * Raised when the loader is disposed.
+        */
+        readonly onDisposeObservable: Observable<GLTFFileLoader>;
+        private _onDisposeObserver;
+        onDispose: () => void;
+        /**
+         * Raised after a loader extension is created.
+         * Set additional options for a loader extension in this event.
+         */
+        readonly onExtensionLoadedObservable: Observable<IGLTFLoaderExtension>;
+        private _onExtensionLoadedObserver;
+        onExtensionLoaded: (extension: IGLTFLoaderExtension) => void;
+        /**
+         * Gets a promise that resolves when the asset to be completely loaded.
+         * @returns A promise that resolves when the asset is completely loaded.
+         */
+        whenCompleteAsync(): Promise<void>;
+        /**
+         * The loader state or null if not active.
+         */
+        readonly loaderState: Nullable<GLTFLoaderState>;
         private _loader;
         name: string;
         extensions: ISceneLoaderPluginExtensions;
+        /**
+         * Disposes the loader, releases resources during load, and cancels any outstanding requests.
+         */
         dispose(): void;
-        importMeshAsync(meshesNames: any, scene: Scene, data: any, rootUrl: string, onSuccess: (meshes: AbstractMesh[], particleSystems: ParticleSystem[], skeletons: Skeleton[]) => void, onProgress: (event: ProgressEvent) => void, onError: (message: string) => void): void;
-        loadAsync(scene: Scene, data: string | ArrayBuffer, rootUrl: string, onSuccess: () => void, onProgress: (event: ProgressEvent) => void, onError: (message: string) => void): void;
+        importMeshAsync(meshesNames: any, scene: Scene, data: any, rootUrl: string, onProgress?: (event: SceneLoaderProgressEvent) => void): Promise<{
+            meshes: AbstractMesh[];
+            particleSystems: ParticleSystem[];
+            skeletons: Skeleton[];
+        }>;
+        loadAsync(scene: Scene, data: string | ArrayBuffer, rootUrl: string, onProgress?: (event: SceneLoaderProgressEvent) => void): Promise<void>;
+        loadAssetContainerAsync(scene: Scene, data: string | ArrayBuffer, rootUrl: string, onProgress?: (event: SceneLoaderProgressEvent) => void): Promise<AssetContainer>;
         canDirectLoad(data: string): boolean;
         rewriteRootURL: (rootUrl: string, responseURL?: string) => string;
         createPlugin(): ISceneLoaderPlugin | ISceneLoaderPluginAsync;
-        private static _parse(data);
+        private _parse(data);
         private _getLoader(loaderData);
         private static _parseBinary(data);
         private static _parseV1(binaryReader);
@@ -445,9 +572,28 @@ declare module BABYLON.GLTF1 {
             [name: string]: GLTFLoaderExtension;
         };
         static RegisterExtension(extension: GLTFLoaderExtension): void;
+        coordinateSystemMode: GLTFLoaderCoordinateSystemMode;
+        animationStartMode: GLTFLoaderAnimationStartMode;
+        compileMaterials: boolean;
+        useClipPlane: boolean;
+        compileShadowGenerators: boolean;
+        onDisposeObservable: Observable<IGLTFLoader>;
+        onMeshLoadedObservable: Observable<AbstractMesh>;
+        onTextureLoadedObservable: Observable<BaseTexture>;
+        onMaterialLoadedObservable: Observable<Material>;
+        onAnimationGroupLoadedObservable: Observable<AnimationGroup>;
+        onCompleteObservable: Observable<IGLTFLoader>;
+        onExtensionLoadedObservable: Observable<IGLTFLoaderExtension>;
+        state: Nullable<GLTFLoaderState>;
         dispose(): void;
-        importMeshAsync(meshesNames: any, scene: Scene, data: IGLTFLoaderData, rootUrl: string, onSuccess: (meshes: AbstractMesh[], particleSystems: ParticleSystem[], skeletons: Skeleton[]) => void, onProgress: (event: ProgressEvent) => void, onError: (message: string) => void): boolean;
-        loadAsync(scene: Scene, data: IGLTFLoaderData, rootUrl: string, onSuccess: () => void, onProgress: (event: ProgressEvent) => void, onError: (message: string) => void): void;
+        private _importMeshAsync(meshesNames, scene, data, rootUrl, onSuccess, onProgress, onError);
+        importMeshAsync(meshesNames: any, scene: Scene, data: IGLTFLoaderData, rootUrl: string, onProgress: (event: SceneLoaderProgressEvent) => void): Promise<{
+            meshes: AbstractMesh[];
+            particleSystems: ParticleSystem[];
+            skeletons: Skeleton[];
+        }>;
+        private _loadAsync(scene, data, rootUrl, onSuccess, onProgress, onError);
+        loadAsync(scene: Scene, data: IGLTFLoaderData, rootUrl: string, onProgress: (event: SceneLoaderProgressEvent) => void): Promise<void>;
         private _loadShadersAsync(gltfRuntime, onload);
         private _loadBuffersAsync(gltfRuntime, onLoad, onProgress?);
         private _createNodes(gltfRuntime);
@@ -477,16 +623,6 @@ declare module BABYLON.GLTF1 {
          * @param type: the uniform's type (EParameterType FLOAT, VEC2, VEC3 or VEC4)
          */
         static SetUniform(shaderMaterial: ShaderMaterial | Effect, uniform: string, value: any, type: number): boolean;
-        /**
-        * If the uri is a base64 string
-        * @param uri: the uri to test
-        */
-        static IsBase64(uri: string): boolean;
-        /**
-        * Decode the base64 uri
-        * @param uri: the uri to decode
-        */
-        static DecodeBase64(uri: string): ArrayBuffer;
         /**
         * Returns the wrap mode of the texture
         * @param mode: the mode value

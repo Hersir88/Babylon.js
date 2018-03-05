@@ -128,6 +128,56 @@
             }
         }
 
+        /**
+         * Gets or sets the center of the bounding box associated with the texture (when in cube mode)
+         * It must define where the camera used to render the texture is set
+         */
+        public boundingBoxPosition = Vector3.Zero();
+
+        private _boundingBoxSize: Vector3;
+
+        /**
+         * Gets or sets the size of the bounding box associated with the texture (when in cube mode)
+         * When defined, the cubemap will switch to local mode
+         * @see https://community.arm.com/graphics/b/blog/posts/reflections-based-on-local-cubemaps-in-unity
+         * @example https://www.babylonjs-playground.com/#RNASML
+         */        
+        public set boundingBoxSize(value: Vector3) {
+            if (this._boundingBoxSize && this._boundingBoxSize.equals(value)) {
+                return;
+            }
+            this._boundingBoxSize = value;
+            let scene = this.getScene();
+            if (scene) {
+                scene.markAllMaterialsAsDirty(Material.TextureDirtyFlag);
+            }
+        }
+        public get boundingBoxSize(): Vector3 {
+            return this._boundingBoxSize;
+        }
+
+        /**
+         * In case the RTT has been created with a depth texture, get the associated 
+         * depth texture.
+         * Otherwise, return null.
+         */
+        public depthStencilTexture: Nullable<InternalTexture>;
+
+        /**
+         * Instantiate a render target texture. This is mainly to render of screen the scene to for instance apply post processse
+         * or used a shadow, depth texture...
+         * @param name The friendly name of the texture
+         * @param size The size of the RTT (number if square, or {with: number, height:number} or {ratio:} to define a ratio from the main scene)
+         * @param scene The scene the RTT belongs to. The latest created scene will be used if not precised.
+         * @param generateMipMaps True if mip maps need to be generated after render.
+         * @param doNotChangeAspectRatio True to not change the aspect ratio of the scene in the RTT
+         * @param type The type of the buffer in the RTT (int, half float, float...)
+         * @param isCube True if a cube texture needs to be created
+         * @param samplingMode The sampling mode to be usedwith the render target (Linear, Nearest...)
+         * @param generateDepthBuffer True to generate a depth buffer
+         * @param generateStencilBuffer True to generate a stencil buffer
+         * @param isMulti True if multiple textures need to be created (Draw Buffers)
+         */
         constructor(name: string, size: number | {width: number, height: number} | {ratio: number}, scene: Nullable<Scene>, generateMipMaps?: boolean, doNotChangeAspectRatio: boolean = true, type: number = Engine.TEXTURETYPE_UNSIGNED_INT, public isCube = false, samplingMode = Texture.TRILINEAR_SAMPLINGMODE, generateDepthBuffer = true, generateStencilBuffer = false, isMulti = false) {
             super(null, scene, !generateMipMaps);
             scene = this.getScene();
@@ -445,7 +495,7 @@
                         for (var subIndex = 0; subIndex < mesh.subMeshes.length; subIndex++) {
                             var subMesh = mesh.subMeshes[subIndex];
                             scene._activeIndices.addCount(subMesh.indexCount, false);
-                            this._renderingManager.dispatch(subMesh);
+                            this._renderingManager.dispatch(subMesh, mesh);
                         }
                     }
                 }
@@ -495,6 +545,15 @@
             return Math.min(Tools.FloorPOT(renderDimension), curved);
         }
 
+        protected unbindFrameBuffer(engine: Engine, faceIndex: number): void {
+            if (!this._texture) {
+                return;
+            }
+            engine.unBindFramebuffer(this._texture, this.isCube, () => {
+                this.onAfterRenderObservable.notifyObservers(faceIndex);
+            });
+        }
+
         private renderToTarget(faceIndex: number, currentRenderList: AbstractMesh[], currentRenderListLength: number, useCameraPostProcess: boolean, dumpForDebug: boolean): void {
             var scene = this.getScene();
             
@@ -514,7 +573,7 @@
             }
             else if (!useCameraPostProcess || !scene.postProcessManager._prepareFrame(this._texture)) {
                 if (this._texture) {
-                    engine.bindFramebuffer(this._texture, this.isCube ? faceIndex : undefined, undefined, undefined, this.ignoreCameraViewport);
+                    engine.bindFramebuffer(this._texture, this.isCube ? faceIndex : undefined, undefined, undefined, this.ignoreCameraViewport, this.depthStencilTexture ? this.depthStencilTexture : undefined);
                 }
             }
 
@@ -559,9 +618,8 @@
                     }
                 }
 
-                engine.unBindFramebuffer(this._texture, this.isCube, () => {
-                    this.onAfterRenderObservable.notifyObservers(faceIndex);
-                });
+            this.unbindFrameBuffer(engine, faceIndex);
+
             } else {
                 this.onAfterRenderObservable.notifyObservers(faceIndex);
             }

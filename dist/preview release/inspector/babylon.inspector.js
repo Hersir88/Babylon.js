@@ -289,6 +289,7 @@ var INSPECTOR;
                     }
                 }
             }
+            INSPECTOR.Scheduler.getInstance().dispose();
         };
         /** Open the inspector in a new popup
          * Set 'firstTime' to true if there is no inspector created beforehands
@@ -301,6 +302,9 @@ var INSPECTOR;
             else {
                 // Create popup
                 var popup = window.open('', 'Babylon.js INSPECTOR', 'toolbar=no,resizable=yes,menubar=no,width=750,height=1000');
+                if (!popup) {
+                    return;
+                }
                 popup.document.title = 'Babylon.js INSPECTOR';
                 // Get the inspector style      
                 var styles = Inspector.DOCUMENT.querySelectorAll('style');
@@ -379,7 +383,7 @@ var INSPECTOR;
         },
         'Color3': {
             type: BABYLON.Color3,
-            format: function (color) { return "R:" + color.r + ", G:" + color.g + ", B:" + color.b; },
+            format: function (color) { return "R:" + color.r.toPrecision(2) + ", G:" + color.g.toPrecision(2) + ", B:" + color.b.toPrecision(2); },
             slider: {
                 r: { min: 0, max: 1, step: 0.01 },
                 g: { min: 0, max: 1, step: 0.01 },
@@ -1160,6 +1164,9 @@ var INSPECTOR;
         Object.defineProperty(DetailPanel.prototype, "details", {
             set: function (detailsRow) {
                 this.clean();
+                //add the searchBar
+                this._addSearchBarDetails();
+                this._details = INSPECTOR.Helpers.CreateDiv('details', this._div);
                 this._detailRows = detailsRow;
                 // Refresh HTML
                 this.update();
@@ -1175,16 +1182,49 @@ var INSPECTOR;
             this._div.appendChild(this._headerRow);
         };
         /** Updates the HTML of the detail panel */
-        DetailPanel.prototype.update = function () {
+        DetailPanel.prototype.update = function (_items) {
             this._sortDetails('name', 1);
-            this._addDetails();
+            // Check the searchbar
+            if (_items) {
+                this.cleanRow();
+                this._addSearchDetails(_items);
+                //console.log(_items);
+            }
+            else {
+                this._addDetails();
+                //console.log("np");
+            }
+        };
+        /** Add the search bar for the details */
+        DetailPanel.prototype._addSearchBarDetails = function () {
+            var searchDetails = INSPECTOR.Helpers.CreateDiv('searchbar-details', this._div);
+            // Create search bar
+            this._searchDetails = new INSPECTOR.SearchBarDetails(this);
+            searchDetails.appendChild(this._searchDetails.toHtml());
+            this._div.appendChild(searchDetails);
+        };
+        /** Search an element by name  */
+        DetailPanel.prototype.searchByName = function (searchName) {
+            var rows = [];
+            for (var _i = 0, _a = this._detailRows; _i < _a.length; _i++) {
+                var row = _a[_i];
+                if (row.name.indexOf(searchName) >= 0) {
+                    rows.push(row);
+                }
+            }
+            this.update(rows);
         };
         /** Add all lines in the html div. Does not sort them! */
         DetailPanel.prototype._addDetails = function () {
-            var details = INSPECTOR.Helpers.CreateDiv('details', this._div);
             for (var _i = 0, _a = this._detailRows; _i < _a.length; _i++) {
                 var row = _a[_i];
-                details.appendChild(row.toHtml());
+                this._details.appendChild(row.toHtml());
+            }
+        };
+        DetailPanel.prototype._addSearchDetails = function (_items) {
+            for (var _i = 0, _items_1 = _items; _i < _items_1.length; _i++) {
+                var row = _items_1[_i];
+                this._details.appendChild(row.toHtml());
             }
         };
         /**
@@ -1246,6 +1286,17 @@ var INSPECTOR;
             INSPECTOR.Helpers.CleanDiv(this._div);
             // Header row
             this._div.appendChild(this._headerRow);
+        };
+        /**
+         * Clean the rows only
+         */
+        DetailPanel.prototype.cleanRow = function () {
+            // Delete all details row
+            for (var _i = 0, _a = this._detailRows; _i < _a.length; _i++) {
+                var pline = _a[_i];
+                pline.dispose();
+            }
+            INSPECTOR.Helpers.CleanDiv(this._details);
         };
         /** Overrides basicelement.dispose */
         DetailPanel.prototype.dispose = function () {
@@ -1559,8 +1610,9 @@ var INSPECTOR;
         PropertyLine.prototype._createElements = function () {
             // Colors
             if (this.type == 'Color3' || this.type == 'Color4') {
-                this._elements.push(new INSPECTOR.ColorPickerElement(this.value, this));
-                //this._elements.push(new ColorElement(this.value));
+                if (!INSPECTOR.Helpers.IsBrowserIE()) {
+                    this._elements.push(new INSPECTOR.ColorPickerElement(this.value, this));
+                }
             }
             // Texture
             if (this.type == 'Texture') {
@@ -1625,6 +1677,57 @@ var INSPECTOR;
             }
             else {
                 this._valueDiv.childNodes[0].nodeValue = this._displayValueContent();
+                //Doing the Hexa convertion
+                if ((this._property.type == "Color3" && this._children.length == 5 && this._children[1].value == true) || (this._property.type == "Color4" && this._children.length == 6 && this._children[1].value == true)) {
+                    if (this._children[0] != undefined && this._children[0].name == "hex") {
+                        var hexLineString = this._children[0].value;
+                        var rValue = (parseInt((hexLineString.slice(1, 3)), 16)) * (1 / 255);
+                        var rValueRound = Math.round(100 * rValue) / 100;
+                        this.value.r = rValueRound;
+                        var gValue = (parseInt((hexLineString.slice(3, 5)), 16)) * (1 / 255);
+                        var gValueRound = Math.round(100 * gValue) / 100;
+                        this.value.g = gValueRound;
+                        var bValue = (parseInt((hexLineString.slice(5, 7)), 16)) * (1 / 255);
+                        var bValueRound = Math.round(100 * bValue) / 100;
+                        this.value.b = bValueRound;
+                        if (this._children[2].name == "a") {
+                            var aValue = (parseInt((hexLineString.slice(7, 9)), 16)) * (1 / 255);
+                            var aValueRound = Math.round(100 * aValue) / 100;
+                            this.value.a = aValueRound;
+                        }
+                    }
+                }
+                else if (this._property.type == "Color3" || this._property.type == "Color4") {
+                    if (this._property.value.hex != undefined && this._property.value.hex != null) {
+                        var hexLineInfos = [];
+                        var valHexR = ((this._property.value.r * 255) | 0).toString(16);
+                        hexLineInfos.push(valHexR);
+                        if (valHexR == "0") {
+                            hexLineInfos.push("0");
+                        }
+                        var valHexG = ((this._property.value.g * 255) | 0).toString(16);
+                        hexLineInfos.push(valHexG);
+                        if (valHexG == "0") {
+                            hexLineInfos.push("0");
+                        }
+                        var valHexB = ((this._property.value.b * 255) | 0).toString(16);
+                        hexLineInfos.push(valHexB);
+                        if (valHexB == "0") {
+                            hexLineInfos.push("0");
+                        }
+                        if (this._property.value.a != undefined) {
+                            var valHexA = ((this._property.value.a * 255) | 0).toString(16);
+                            hexLineInfos.push(valHexA);
+                            if (valHexA == "0") {
+                                hexLineInfos.push("0");
+                            }
+                        }
+                        hexLineInfos.unshift("#");
+                        var hexLineString = hexLineInfos.join("");
+                        this._property.value.hex = hexLineString;
+                        hexLineInfos.length = 0;
+                    }
+                }
             }
             for (var _i = 0, _a = this._elements; _i < _a.length; _i++) {
                 var elem = _a[_i];
@@ -1696,18 +1799,48 @@ var INSPECTOR;
                     var objToDetail = this.value;
                     // Display all properties that are not functions
                     var propToDisplay = INSPECTOR.Helpers.GetAllLinesPropertiesAsString(objToDetail);
-                    propToDisplay.sort().reverse();
+                    // special case for color3
+                    if ((propToDisplay.indexOf('r') && propToDisplay.indexOf('g') && propToDisplay.indexOf('b')) == 0) {
+                        propToDisplay.sort();
+                    }
+                    else {
+                        propToDisplay.sort().reverse();
+                    }
                     for (var _b = 0, propToDisplay_1 = propToDisplay; _b < propToDisplay_1.length; _b++) {
                         var prop = propToDisplay_1[_b];
                         var infos = new INSPECTOR.Property(prop, this._property.value);
                         var child = new PropertyLine(infos, this, this._level + PropertyLine._MARGIN_LEFT);
                         this._children.push(child);
                     }
+                    //Add the Hexa converter
+                    if ((propToDisplay.indexOf('r') && propToDisplay.indexOf('g') && propToDisplay.indexOf('b') && propToDisplay.indexOf('a')) == 0) {
+                        var hexLineInfos = [];
+                        var hexLinePropCheck = new INSPECTOR.Property("hexEnable", this._property.value);
+                        hexLinePropCheck.value = false;
+                        var hexLineCheck = new PropertyLine(hexLinePropCheck, this, this._level + PropertyLine._MARGIN_LEFT);
+                        this._children.unshift(hexLineCheck);
+                        for (var _c = 0, propToDisplay_2 = propToDisplay; _c < propToDisplay_2.length; _c++) {
+                            var prop = propToDisplay_2[_c];
+                            var infos = new INSPECTOR.Property(prop, this._property.value);
+                            var valHex = ((infos.value * 255) | 0).toString(16);
+                            hexLineInfos.push(valHex);
+                            if (valHex == "0") {
+                                hexLineInfos.push("0");
+                            }
+                        }
+                        hexLineInfos.push("#");
+                        hexLineInfos.reverse();
+                        var hexLineString = hexLineInfos.join("");
+                        var hexLineProp = new INSPECTOR.Property("hex", this._property.value);
+                        hexLineProp.value = hexLineString;
+                        var hexLine = new PropertyLine(hexLineProp, this, this._level + PropertyLine._MARGIN_LEFT);
+                        this._children.unshift(hexLine);
+                    }
                 }
                 // otherwise display it    
                 if (this._div.parentNode) {
-                    for (var _c = 0, _d = this._children; _c < _d.length; _c++) {
-                        var child = _d[_c];
+                    for (var _d = 0, _e = this._children; _d < _e.length; _d++) {
+                        var child = _e[_d];
                         this._div.parentNode.insertBefore(child.toHtml(), this._div.nextSibling);
                     }
                 }
@@ -2101,7 +2234,7 @@ var INSPECTOR;
         __extends(SearchBar, _super);
         function SearchBar(tab) {
             var _this = _super.call(this) || this;
-            _this._tab = tab;
+            _this._propTab = tab;
             _this._div.classList.add('searchbar');
             var filter = INSPECTOR.Inspector.DOCUMENT.createElement('i');
             filter.className = 'fa fa-search';
@@ -2112,7 +2245,7 @@ var INSPECTOR;
             _this._div.appendChild(_this._inputElement);
             _this._inputElement.addEventListener('keyup', function (evt) {
                 var filter = _this._inputElement.value;
-                _this._tab.filter(filter);
+                _this._propTab.filter(filter);
             });
             return _this;
         }
@@ -2126,6 +2259,35 @@ var INSPECTOR;
         return SearchBar;
     }(INSPECTOR.BasicElement));
     INSPECTOR.SearchBar = SearchBar;
+    var SearchBarDetails = /** @class */ (function (_super) {
+        __extends(SearchBarDetails, _super);
+        function SearchBarDetails(tab) {
+            var _this = _super.call(this) || this;
+            _this._detailTab = tab;
+            _this._div.classList.add('searchbar');
+            var filter = INSPECTOR.Inspector.DOCUMENT.createElement('i');
+            filter.className = 'fa fa-search';
+            _this._div.appendChild(filter);
+            // Create input
+            _this._inputElement = INSPECTOR.Inspector.DOCUMENT.createElement('input');
+            _this._inputElement.placeholder = 'Filter by name...';
+            _this._div.appendChild(_this._inputElement);
+            _this._inputElement.addEventListener('keyup', function (evt) {
+                var filter = _this._inputElement.value;
+                _this._detailTab.searchByName(filter);
+            });
+            return _this;
+        }
+        /** Delete all characters typped in the input element */
+        SearchBarDetails.prototype.reset = function () {
+            this._inputElement.value = '';
+        };
+        SearchBarDetails.prototype.update = function () {
+            // Nothing to update
+        };
+        return SearchBarDetails;
+    }(INSPECTOR.BasicElement));
+    INSPECTOR.SearchBarDetails = SearchBarDetails;
 })(INSPECTOR || (INSPECTOR = {}));
 
 var __extends = (this && this.__extends) || (function () {
@@ -2247,6 +2409,14 @@ var INSPECTOR;
         Helpers.IsBrowserEdge = function () {
             //Detect if we are running on a faulty buggy OS.
             var regexp = /Edge/;
+            return regexp.test(navigator.userAgent);
+        };
+        /**
+         * Returns true if the user browser is IE.
+         */
+        Helpers.IsBrowserIE = function () {
+            //Detect if we are running on a faulty buggy OS.
+            var regexp = /Trident.*rv\:11\./;
             return regexp.test(navigator.userAgent);
         };
         /**
@@ -2386,11 +2556,12 @@ var INSPECTOR;
          * Returns an array of string corresponding to tjhe list of properties of the object to be displayed
          * @param obj
          */
-        Helpers.GetAllLinesPropertiesAsString = function (obj) {
+        Helpers.GetAllLinesPropertiesAsString = function (obj, dontTakeThis) {
+            if (dontTakeThis === void 0) { dontTakeThis = []; }
             var props = [];
             for (var prop in obj) {
                 //No private and no function
-                if (prop.substring(0, 1) !== '_' && typeof obj[prop] !== 'function') {
+                if (dontTakeThis.indexOf(prop) === -1 && prop.substring(0, 1) !== '_' && typeof obj[prop] !== 'function') {
                     props.push(prop);
                 }
             }
@@ -2412,7 +2583,7 @@ var INSPECTOR;
             this.pause = false;
             /** The list of data to update */
             this._updatableProperties = [];
-            this._timer = setInterval(this._update.bind(this), Scheduler.REFRESH_TIME);
+            this.interval = setInterval(this._update.bind(this), Scheduler.REFRESH_TIME);
         }
         Scheduler.getInstance = function () {
             if (!Scheduler._instance) {
@@ -2439,6 +2610,9 @@ var INSPECTOR;
                     prop.update();
                 }
             }
+        };
+        Scheduler.prototype.dispose = function () {
+            window.clearInterval(this.interval);
         };
         /** All properties are refreshed every 250ms */
         Scheduler.REFRESH_TIME = 250;
@@ -3193,9 +3367,12 @@ var INSPECTOR;
             _this._panel.appendChild(_this._detailsPanel.toHtml());
             // build propertiesline
             var details = [];
-            var props = INSPECTOR.Helpers.GetAllLinesProperties(_this._inspector.scene);
+            // Remove deprecated properties generating warning in console
+            var dontTakeThis = ['interFramePerfCounter', 'lastFramePerfCounter', 'evaluateActiveMeshesDurationPerfCounter', 'renderDurationPerfCounter', 'particlesDurationPerfCounter', 'spriteDuractionPerfCounter'];
+            var props = INSPECTOR.Helpers.GetAllLinesPropertiesAsString(_this._inspector.scene, dontTakeThis);
             for (var _i = 0, props_1 = props; _i < props_1.length; _i++) {
-                var prop = props_1[_i];
+                var propString = props_1[_i];
+                var prop = new INSPECTOR.PropertyLine(new INSPECTOR.Property(propString, _this._inspector.scene));
                 details.push(prop);
             }
             _this._detailsPanel.details = details;
@@ -3533,61 +3710,67 @@ var INSPECTOR;
             title = INSPECTOR.Helpers.CreateDiv('stat-title2', _this._panel);
             title.textContent = "Count";
             {
-                var elemLabel = _this._createStatLabel("Total meshes", _this._panel);
+                _this._createStatLabel("Total meshes", _this._panel);
                 var elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return _this._scene.meshes.length.toString(); }
                 });
-                elemLabel = _this._createStatLabel("Draw calls", _this._panel);
+                _this._createStatLabel("Draw calls", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return _this._sceneInstrumentation.drawCallsCounter.current.toString(); }
                 });
-                elemLabel = _this._createStatLabel("Total lights", _this._panel);
+                _this._createStatLabel("Texture collisions", _this._panel);
+                elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
+                _this._updatableProperties.push({
+                    elem: elemValue,
+                    updateFct: function () { return _this._sceneInstrumentation.textureCollisionsCounter.current.toString(); }
+                });
+                _this._createStatLabel("Total lights", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return _this._scene.lights.length.toString(); }
                 });
-                elemLabel = _this._createStatLabel("Total vertices", _this._panel);
+                _this._createStatLabel("Total vertices", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return _this._scene.getTotalVertices().toString(); }
                 });
-                elemLabel = _this._createStatLabel("Total materials", _this._panel);
+                _this._createStatLabel("Total materials", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return _this._scene.materials.length.toString(); }
                 });
-                elemLabel = _this._createStatLabel("Total textures", _this._panel);
+                _this._createStatLabel("Total textures", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return _this._scene.textures.length.toString(); }
                 });
-                elemLabel = _this._createStatLabel("Active meshes", _this._panel);
+                _this._createStatLabel("Active meshes", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return _this._scene.getActiveMeshes().length.toString(); }
                 });
-                elemLabel = _this._createStatLabel("Active indices", _this._panel);
+                _this._createStatLabel("Active indices", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return _this._scene.getActiveIndices().toString(); }
                 });
-                elemLabel = _this._createStatLabel("Active bones", _this._panel);
+                _this._createStatLabel("Active bones", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return _this._scene.getActiveBones().toString(); }
                 });
-                elemLabel = _this._createStatLabel("Active particles", _this._panel);
+                _this._createStatLabel("Active particles", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
@@ -3597,79 +3780,79 @@ var INSPECTOR;
             title = INSPECTOR.Helpers.CreateDiv('stat-title2', _this._panel);
             title.textContent = "Duration";
             {
-                var elemLabel = _this._createStatLabel("Meshes selection", _this._panel);
+                _this._createStatLabel("Meshes selection", _this._panel);
                 var elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return BABYLON.Tools.Format(_this._sceneInstrumentation.activeMeshesEvaluationTimeCounter.current); }
                 });
-                elemLabel = _this._createStatLabel("Render targets", _this._panel);
+                _this._createStatLabel("Render targets", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return BABYLON.Tools.Format(_this._sceneInstrumentation.renderTargetsRenderTimeCounter.current); }
                 });
-                elemLabel = _this._createStatLabel("Particles", _this._panel);
+                _this._createStatLabel("Particles", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return BABYLON.Tools.Format(_this._sceneInstrumentation.particlesRenderTimeCounter.current); }
                 });
-                elemLabel = _this._createStatLabel("Sprites", _this._panel);
+                _this._createStatLabel("Sprites", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return BABYLON.Tools.Format(_this._sceneInstrumentation.spritesRenderTimeCounter.current); }
                 });
-                elemLabel = _this._createStatLabel("Animations", _this._panel);
+                _this._createStatLabel("Animations", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return BABYLON.Tools.Format(_this._sceneInstrumentation.animationsTimeCounter.current); }
                 });
-                elemLabel = _this._createStatLabel("Physics", _this._panel);
+                _this._createStatLabel("Physics", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return BABYLON.Tools.Format(_this._sceneInstrumentation.physicsTimeCounter.current); }
                 });
-                elemLabel = _this._createStatLabel("Render", _this._panel);
+                _this._createStatLabel("Render", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return BABYLON.Tools.Format(_this._sceneInstrumentation.renderTimeCounter.current); }
                 });
-                elemLabel = _this._createStatLabel("Frame", _this._panel);
+                _this._createStatLabel("Frame", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return BABYLON.Tools.Format(_this._sceneInstrumentation.frameTimeCounter.current); }
                 });
-                elemLabel = _this._createStatLabel("Inter-frame", _this._panel);
+                _this._createStatLabel("Inter-frame", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return BABYLON.Tools.Format(_this._sceneInstrumentation.interFrameTimeCounter.current); }
                 });
-                elemLabel = _this._createStatLabel("GPU Frame time", _this._panel);
+                _this._createStatLabel("GPU Frame time", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return BABYLON.Tools.Format(_this._engineInstrumentation.gpuFrameTimeCounter.current * 0.000001); }
                 });
-                elemLabel = _this._createStatLabel("GPU Frame time (average)", _this._panel);
+                _this._createStatLabel("GPU Frame time (average)", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return BABYLON.Tools.Format(_this._engineInstrumentation.gpuFrameTimeCounter.average * 0.000001); }
                 });
-                elemLabel = _this._createStatLabel("Potential FPS", _this._panel);
+                _this._createStatLabel("Potential FPS", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return BABYLON.Tools.Format(1000.0 / _this._sceneInstrumentation.frameTimeCounter.current, 0); }
                 });
-                elemLabel = _this._createStatLabel("Resolution", _this._panel);
+                _this._createStatLabel("Resolution", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
@@ -3679,61 +3862,61 @@ var INSPECTOR;
             title = INSPECTOR.Helpers.CreateDiv('stat-title2', _this._panel);
             title.textContent = "Extensions";
             {
-                var elemLabel = _this._createStatLabel("Std derivatives", _this._panel);
+                _this._createStatLabel("Std derivatives", _this._panel);
                 var elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return (_this._engine.getCaps().standardDerivatives ? "Yes" : "No"); }
                 });
-                elemLabel = _this._createStatLabel("Compressed textures", _this._panel);
+                _this._createStatLabel("Compressed textures", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return (_this._engine.getCaps().s3tc ? "Yes" : "No"); }
                 });
-                elemLabel = _this._createStatLabel("Hardware instances", _this._panel);
+                _this._createStatLabel("Hardware instances", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return (_this._engine.getCaps().instancedArrays ? "Yes" : "No"); }
                 });
-                elemLabel = _this._createStatLabel("Texture float", _this._panel);
+                _this._createStatLabel("Texture float", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return (_this._engine.getCaps().textureFloat ? "Yes" : "No"); }
                 });
-                elemLabel = _this._createStatLabel("32bits indices", _this._panel);
+                _this._createStatLabel("32bits indices", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return (_this._engine.getCaps().uintIndices ? "Yes" : "No"); }
                 });
-                elemLabel = _this._createStatLabel("Fragment depth", _this._panel);
+                _this._createStatLabel("Fragment depth", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return (_this._engine.getCaps().fragmentDepthSupported ? "Yes" : "No"); }
                 });
-                elemLabel = _this._createStatLabel("High precision shaders", _this._panel);
+                _this._createStatLabel("High precision shaders", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return (_this._engine.getCaps().highPrecisionShaderSupported ? "Yes" : "No"); }
                 });
-                elemLabel = _this._createStatLabel("Draw buffers", _this._panel);
+                _this._createStatLabel("Draw buffers", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return (_this._engine.getCaps().drawBuffersExtension ? "Yes" : "No"); }
                 });
-                elemLabel = _this._createStatLabel("Vertex array object", _this._panel);
+                _this._createStatLabel("Vertex array object", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return (_this._engine.getCaps().vertexArrayObject ? "Yes" : "No"); }
                 });
-                elemLabel = _this._createStatLabel("Timer query", _this._panel);
+                _this._createStatLabel("Timer query", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
@@ -3743,25 +3926,25 @@ var INSPECTOR;
             title = INSPECTOR.Helpers.CreateDiv('stat-title2', _this._panel);
             title.textContent = "Caps.";
             {
-                var elemLabel = _this._createStatLabel("Stencil", _this._panel);
+                _this._createStatLabel("Stencil", _this._panel);
                 var elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return (_this._engine.isStencilEnable ? "Enabled" : "Disabled"); }
                 });
-                elemLabel = _this._createStatLabel("Max textures units", _this._panel);
+                _this._createStatLabel("Max textures units", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return _this._engine.getCaps().maxTexturesImageUnits.toString(); }
                 });
-                elemLabel = _this._createStatLabel("Max textures size", _this._panel);
+                _this._createStatLabel("Max textures size", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
                     updateFct: function () { return _this._engine.getCaps().maxTextureSize.toString(); }
                 });
-                elemLabel = _this._createStatLabel("Max anisotropy", _this._panel);
+                _this._createStatLabel("Max anisotropy", _this._panel);
                 elemValue = INSPECTOR.Helpers.CreateDiv('stat-value', _this._panel);
                 _this._updatableProperties.push({
                     elem: elemValue,
@@ -4536,7 +4719,18 @@ var INSPECTOR;
         };
         /** Build the HTML of this item */
         TreeItem.prototype._build = function () {
-            this._div.className = 'line';
+            /**
+             *  Hide the debug objects :
+             * - Axis : xline, yline, zline
+             * */
+            var adapterId = this._adapter.id();
+            if (adapterId == "xline"
+                || adapterId == "yline"
+                || adapterId == "zline") {
+                this._div.className = "line_invisible";
+            }
+            else
+                this._div.className = 'line';
             // special class for transform node ONLY
             if (this.adapter instanceof INSPECTOR.MeshAdapter) {
                 var obj = this.adapter.object;
@@ -4768,7 +4962,6 @@ var INSPECTOR;
         function SoundInteractions(playSound) {
             var _this = _super.call(this) || this;
             _this.playSound = playSound;
-            _this.b = false;
             _this._elem.classList.add('fa-play');
             return _this;
         }
@@ -4907,7 +5100,7 @@ var INSPECTOR;
             var _this = _super.call(this) || this;
             _this._obj = obj;
             _this._elem.classList.add('fa-info-circle');
-            _this._tooltip = new INSPECTOR.Tooltip(_this._elem, _this._obj.getInfo(), _this._elem);
+            new INSPECTOR.Tooltip(_this._elem, _this._obj.getInfo(), _this._elem);
             return _this;
         }
         // Nothing to do on click
