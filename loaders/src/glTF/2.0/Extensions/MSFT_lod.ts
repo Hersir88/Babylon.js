@@ -42,7 +42,10 @@ module BABYLON.GLTF2.Extensions {
                     const promise = this._loader._loadNodeAsync(`#/nodes/${nodeLOD._index}`, nodeLOD).then(() => {
                         if (indexLOD !== 0) {
                             const previousNodeLOD = nodeLODs[indexLOD - 1];
-                            previousNodeLOD._babylonMesh!.setEnabled(false);
+                            if (previousNodeLOD._babylonMesh) {
+                                previousNodeLOD._babylonMesh.dispose(false, true);
+                                delete previousNodeLOD._babylonMesh;
+                            }
                         }
 
                         if (indexLOD !== nodeLODs.length - 1) {
@@ -68,7 +71,7 @@ module BABYLON.GLTF2.Extensions {
             });
         }
 
-        protected _loadMaterialAsync(context: string, material: ILoaderMaterial, babylonMesh: Mesh, assign: (babylonMaterial: Material) => void): Nullable<Promise<void>> {
+        protected _loadMaterialAsync(context: string, material: ILoaderMaterial, babylonMesh: Mesh, babylonDrawMode: number, assign: (babylonMaterial: Material) => void): Nullable<Promise<void>> {
             // Don't load material LODs if already loading a node LOD.
             if (this._loadingNodeLOD) {
                 return null;
@@ -89,9 +92,16 @@ module BABYLON.GLTF2.Extensions {
                         }
                     }
 
-                    const promise = this._loader._loadMaterialAsync(`#/materials/${materialLOD._index}`, materialLOD, babylonMesh, indexLOD === 0 ? assign : () => {}).then(() => {
+                    const promise = this._loader._loadMaterialAsync(`#/materials/${materialLOD._index}`, materialLOD, babylonMesh, babylonDrawMode, indexLOD === 0 ? assign : () => {}).then(() => {
                         if (indexLOD !== 0) {
-                            assign(materialLOD._babylonMaterial!);
+                            const babylonDataLOD = materialLOD._babylonData!;
+                            assign(babylonDataLOD[babylonDrawMode].material);
+
+                            const previousBabylonDataLOD = materialLODs[indexLOD - 1]._babylonData!;
+                            if (previousBabylonDataLOD[babylonDrawMode]) {
+                                previousBabylonDataLOD[babylonDrawMode].material.dispose();
+                                delete previousBabylonDataLOD[babylonDrawMode];
+                            }
                         }
 
                         if (indexLOD !== materialLODs.length - 1) {

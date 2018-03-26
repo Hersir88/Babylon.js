@@ -118,7 +118,6 @@
 
         /**
         * An event triggered when this mesh collides with another one
-        * @type {BABYLON.Observable}
         */
         public onCollideObservable = new Observable<AbstractMesh>();
 
@@ -132,7 +131,6 @@
 
         /**
         * An event triggered when the collision's position changes
-        * @type {BABYLON.Observable}
         */
         public onCollisionPositionChangeObservable = new Observable<Vector3>();
 
@@ -146,7 +144,6 @@
 
         /**
         * An event triggered when material is changed
-        * @type {BABYLON.Observable}
         */
         public onMaterialChangedObservable = new Observable<AbstractMesh>();
 
@@ -367,7 +364,6 @@
 
         /**
          * This scene's action manager
-         * @type {BABYLON.ActionManager}
         */
         public actionManager: Nullable<ActionManager> = null;
 
@@ -1333,6 +1329,10 @@
         public dispose(doNotRecurse?: boolean, disposeMaterialAndTextures = false): void {
             var index: number;
 
+            // Smart Array Retainers.
+            this.getScene().freeActiveMeshes();
+            this.getScene().freeRenderingGroups();
+
             // Action manager
             if (this.actionManager !== undefined && this.actionManager !== null) {
                 this.actionManager.dispose();
@@ -1340,7 +1340,7 @@
             }
 
             // Skeleton
-            this.skeleton = null;
+            this._skeleton = null;
 
             // Physics
             if (this.physicsImpostor) {

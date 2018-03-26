@@ -68,19 +68,16 @@
 
         /**
          * An event triggered before rendering the mesh
-         * @type {BABYLON.Observable}
          */
         public onBeforeRenderObservable = new Observable<Mesh>();
 
         /**
         * An event triggered after rendering the mesh
-        * @type {BABYLON.Observable}
         */
         public onAfterRenderObservable = new Observable<Mesh>();
 
         /**
         * An event triggered before drawing the mesh
-        * @type {BABYLON.Observable}
         */
         public onBeforeDrawObservable = new Observable<Mesh>();
 
@@ -186,7 +183,9 @@
                 }
 
                 // Deep copy
-                Tools.DeepCopy(source, this, ["name", "material", "skeleton", "instances", "parent", "uniqueId", "source", "metadata"], ["_poseMatrix", "_source"]);
+                Tools.DeepCopy(source, this, ["name", "material", "skeleton", "instances", "parent", "uniqueId", 
+                                              "source", "metadata", "hasLODLevels", "geometry", "isBlocked", "areNormalsFrozen"], 
+                                              ["_poseMatrix", "_source"]);
 
                 // Metadata
                 if (source.metadata && source.metadata.clone) {

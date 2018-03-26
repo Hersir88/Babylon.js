@@ -29,7 +29,7 @@ module BABYLON {
         }
 
         /**
-         * Creates a new instance of @see ConeParticleEmitter
+         * Creates a new instance ConeParticleEmitter
          * @param radius the radius of the emission cone (1 by default)
          * @param angles the cone base angle (PI by default)
          * @param directionRandomizer defines how much to randomize the particle direction [0-1]
@@ -84,7 +84,7 @@ module BABYLON {
             // Better distribution in a cone at normal angles.
             h = 1 - h * h;
             var radius = Scalar.RandomRange(0, this._radius);
-            radius = radius * h / this._height;
+            radius = radius * h;
 
             var randX = radius * Math.sin(s);
             var randZ = radius * Math.cos(s);

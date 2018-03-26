@@ -92,7 +92,7 @@
 
     /**
      * Represents a scene to be rendered by the engine.
-     * @see http://doc.babylonjs.com/page.php?p=21911
+     * @see http://doc.babylonjs.com/features/scene
      */
     export class Scene implements IAnimatable {
         // Statics
@@ -170,7 +170,18 @@
             return this._imageProcessingConfiguration;
         }
 
-        public forceWireframe = false;
+        private _forceWireframe = false;
+        public set forceWireframe(value: boolean) {
+            if (this._forceWireframe === value) {
+                return;
+            }
+            this._forceWireframe = value;
+            this.markAllMaterialsAsDirty(Material.MiscDirtyFlag);
+        }
+        public get forceWireframe(): boolean {
+            return this._forceWireframe;
+        }
+
         private _forcePointsCloud = false;
         public set forcePointsCloud(value: boolean) {
             if (this._forcePointsCloud === value) {
@@ -201,17 +212,21 @@
         public metadata: any = null;
         public loadingPluginName: string;
 
+        /**
+         * Use this array to add regular expressions used to disable offline support for specific urls
+         */
+        public disableOfflineSupportExceptionRules = new Array<RegExp>();        
+
         // Events
 
         private _spritePredicate: (sprite: Sprite) => boolean;
 
         /**
         * An event triggered when the scene is disposed.
-        * @type {BABYLON.Observable}
         */
         public onDisposeObservable = new Observable<Scene>();
 
-        private _onDisposeObserver: Nullable<Observer<Scene>>;
+        private _onDisposeObserver: Nullable<Observer<Scene>> = null;
         /** A function to be executed when this scene is disposed. */
         public set onDispose(callback: () => void) {
             if (this._onDisposeObserver) {
@@ -222,11 +237,10 @@
 
         /**
         * An event triggered before rendering the scene (right after animations and physics)
-        * @type {BABYLON.Observable}
         */
         public onBeforeRenderObservable = new Observable<Scene>();
 
-        private _onBeforeRenderObserver: Nullable<Observer<Scene>>;
+        private _onBeforeRenderObserver: Nullable<Observer<Scene>> = null;
         /** A function to be executed before rendering this scene */
         public set beforeRender(callback: Nullable<() => void>) {
             if (this._onBeforeRenderObserver) {
@@ -239,11 +253,10 @@
 
         /**
         * An event triggered after rendering the scene
-        * @type {BABYLON.Observable}
         */
         public onAfterRenderObservable = new Observable<Scene>();
 
-        private _onAfterRenderObserver: Nullable<Observer<Scene>>;
+        private _onAfterRenderObserver: Nullable<Observer<Scene>> = null;
         /** A function to be executed after rendering this scene */
         public set afterRender(callback: Nullable<() => void>) {
             if (this._onAfterRenderObserver) {
@@ -257,53 +270,45 @@
 
         /**
         * An event triggered before animating the scene
-        * @type {BABYLON.Observable}
         */
         public onBeforeAnimationsObservable = new Observable<Scene>();
 
         /**
         * An event triggered after animations processing
-        * @type {BABYLON.Observable}
         */
         public onAfterAnimationsObservable = new Observable<Scene>();
 
         /**
         * An event triggered before draw calls are ready to be sent
-        * @type {BABYLON.Observable}
         */
         public onBeforeDrawPhaseObservable = new Observable<Scene>();
 
         /**
         * An event triggered after draw calls have been sent
-        * @type {BABYLON.Observable}
         */
         public onAfterDrawPhaseObservable = new Observable<Scene>();
 
         /**
         * An event triggered when physic simulation is about to be run
-        * @type {BABYLON.Observable}
         */
         public onBeforePhysicsObservable = new Observable<Scene>();
 
         /**
         * An event triggered when physic simulation has been done
-        * @type {BABYLON.Observable}
         */
         public onAfterPhysicsObservable = new Observable<Scene>();
 
         /**
         * An event triggered when the scene is ready
-        * @type {BABYLON.Observable}
         */
         public onReadyObservable = new Observable<Scene>();
 
         /**
         * An event triggered before rendering a camera
-        * @type {BABYLON.Observable}
         */
         public onBeforeCameraRenderObservable = new Observable<Camera>();
 
-        private _onBeforeCameraRenderObserver: Nullable<Observer<Camera>>;
+        private _onBeforeCameraRenderObserver: Nullable<Observer<Camera>> = null;
         public set beforeCameraRender(callback: () => void) {
             if (this._onBeforeCameraRenderObserver) {
                 this.onBeforeCameraRenderObservable.remove(this._onBeforeCameraRenderObserver);
@@ -314,11 +319,10 @@
 
         /**
         * An event triggered after rendering a camera
-        * @type {BABYLON.Observable}
         */
         public onAfterCameraRenderObservable = new Observable<Camera>();
 
-        private _onAfterCameraRenderObserver: Nullable<Observer<Camera>>;
+        private _onAfterCameraRenderObserver: Nullable<Observer<Camera>> = null;
         public set afterCameraRender(callback: () => void) {
             if (this._onAfterCameraRenderObserver) {
                 this.onAfterCameraRenderObservable.remove(this._onAfterCameraRenderObserver);
@@ -328,133 +332,112 @@
 
         /**
         * An event triggered when active meshes evaluation is about to start
-        * @type {BABYLON.Observable}
         */
         public onBeforeActiveMeshesEvaluationObservable = new Observable<Scene>();
 
         /**
         * An event triggered when active meshes evaluation is done
-        * @type {BABYLON.Observable}
         */
         public onAfterActiveMeshesEvaluationObservable = new Observable<Scene>();
 
         /**
         * An event triggered when particles rendering is about to start
         * Note: This event can be trigger more than once per frame (because particles can be rendered by render target textures as well)
-        * @type {BABYLON.Observable}
         */
         public onBeforeParticlesRenderingObservable = new Observable<Scene>();
 
         /**
         * An event triggered when particles rendering is done
         * Note: This event can be trigger more than once per frame (because particles can be rendered by render target textures as well)
-        * @type {BABYLON.Observable}
         */
         public onAfterParticlesRenderingObservable = new Observable<Scene>();
 
         /**
         * An event triggered when sprites rendering is about to start
         * Note: This event can be trigger more than once per frame (because sprites can be rendered by render target textures as well)
-        * @type {BABYLON.Observable}
         */
         public onBeforeSpritesRenderingObservable = new Observable<Scene>();
 
         /**
         * An event triggered when sprites rendering is done
         * Note: This event can be trigger more than once per frame (because sprites can be rendered by render target textures as well)
-        * @type {BABYLON.Observable}
         */
         public onAfterSpritesRenderingObservable = new Observable<Scene>();
 
         /**
         * An event triggered when SceneLoader.Append or SceneLoader.Load or SceneLoader.ImportMesh were successfully executed
-        * @type {BABYLON.Observable}
         */
         public onDataLoadedObservable = new Observable<Scene>();
 
         /**
         * An event triggered when a camera is created
-        * @type {BABYLON.Observable}
         */
         public onNewCameraAddedObservable = new Observable<Camera>();
 
         /**
         * An event triggered when a camera is removed
-        * @type {BABYLON.Observable}
         */
         public onCameraRemovedObservable = new Observable<Camera>();
 
         /**
         * An event triggered when a light is created
-        * @type {BABYLON.Observable}
         */
         public onNewLightAddedObservable = new Observable<Light>();
 
         /**
         * An event triggered when a light is removed
-        * @type {BABYLON.Observable}
         */
         public onLightRemovedObservable = new Observable<Light>();
 
         /**
         * An event triggered when a geometry is created
-        * @type {BABYLON.Observable}
         */
         public onNewGeometryAddedObservable = new Observable<Geometry>();
 
         /**
         * An event triggered when a geometry is removed
-        * @type {BABYLON.Observable}
         */
         public onGeometryRemovedObservable = new Observable<Geometry>();
 
         /**
         * An event triggered when a transform node is created
-        * @type {BABYLON.Observable}
         */
         public onNewTransformNodeAddedObservable = new Observable<TransformNode>();
 
         /**
         * An event triggered when a transform node is removed
-        * @type {BABYLON.Observable}
         */
         public onTransformNodeRemovedObservable = new Observable<TransformNode>();
 
         /**
         * An event triggered when a mesh is created
-        * @type {BABYLON.Observable}
         */
         public onNewMeshAddedObservable = new Observable<AbstractMesh>();
 
         /**
         * An event triggered when a mesh is removed
-        * @type {BABYLON.Observable}
         */
         public onMeshRemovedObservable = new Observable<AbstractMesh>();
 
         /**
         * An event triggered when render targets are about to be rendered
         * Can happen multiple times per frame.
-        * @type {BABYLON.Observable}
         */
         public OnBeforeRenderTargetsRenderObservable = new Observable<Scene>();
 
         /**
         * An event triggered when render targets were rendered.
         * Can happen multiple times per frame.
-        * @type {BABYLON.Observable}
         */
         public OnAfterRenderTargetsRenderObservable = new Observable<Scene>();
 
         /**
         * An event triggered before calculating deterministic simulation step
-        * @type {BABYLON.Observable}
         */
         public onBeforeStepObservable = new Observable<Scene>();
 
         /**
         * An event triggered after calculating deterministic simulation step
-        * @type {BABYLON.Observable}
         */
         public onAfterStepObservable = new Observable<Scene>();
 
@@ -467,6 +450,7 @@
 
         // Animations
         public animations: Animation[] = [];
+        private _registeredForLateAnimationBindings = new SmartArrayNoDuplicate<any>(256);
 
         // Pointers
         public pointerDownPredicate: (Mesh: AbstractMesh) => boolean;
@@ -477,11 +461,11 @@
         private _onPointerUp: (evt: PointerEvent) => void;
 
         /** Deprecated. Use onPointerObservable instead */
-        public onPointerMove: (evt: PointerEvent, pickInfo: PickingInfo) => void;
+        public onPointerMove: (evt: PointerEvent, pickInfo: PickingInfo, type: PointerEventTypes) => void;
         /** Deprecated. Use onPointerObservable instead */
-        public onPointerDown: (evt: PointerEvent, pickInfo: PickingInfo) => void;
+        public onPointerDown: (evt: PointerEvent, pickInfo: PickingInfo, type: PointerEventTypes) => void;
         /** Deprecated. Use onPointerObservable instead */
-        public onPointerUp: (evt: PointerEvent, pickInfo: Nullable<PickingInfo>) => void;
+        public onPointerUp: (evt: PointerEvent, pickInfo: Nullable<PickingInfo>, type: PointerEventTypes) => void;
         /** Deprecated. Use onPointerObservable instead */
         public onPointerPick: (evt: PointerEvent, pickInfo: PickingInfo) => void;
 
@@ -572,7 +556,6 @@
         // Coordinate system
         /**
         * use right-handed coordinate system on this scene.
-        * @type {boolean}
         */
         private _useRightHandedSystem = false;
         public set useRightHandedSystem(value: boolean) {
@@ -635,7 +618,6 @@
         // Lights
         /**
         * is shadow enabled on this scene.
-        * @type {boolean}
         */
         private _shadowsEnabled = true;
         public set shadowsEnabled(value: boolean) {
@@ -651,7 +633,6 @@
 
         /**
         * is light enabled on this scene.
-        * @type {boolean}
         */
         private _lightsEnabled = true;
         public set lightsEnabled(value: boolean) {
@@ -668,8 +649,6 @@
 
         /**
         * All of the lights added to this scene.
-        * @see BABYLON.Light
-        * @type {BABYLON.Light[]}
         */
         public lights = new Array<Light>();
 
@@ -684,22 +663,16 @@
         // Meshes
         /**
         * All of the tranform nodes added to this scene.
-        * @see BABYLON.TransformNode
-        * @type {BABYLON.TransformNode[]}
         */
         public transformNodes = new Array<TransformNode>();
 
         /**
         * All of the (abstract) meshes added to this scene.
-        * @see BABYLON.AbstractMesh
-        * @type {BABYLON.AbstractMesh[]}
         */
         public meshes = new Array<AbstractMesh>();
 
         /**
         * All of the animation groups added to this scene.
-        * @see BABYLON.AnimationGroup
-        * @type {BABYLON.AnimationGroup[]}
         */
         public animationGroups = new Array<AnimationGroup>();
 
@@ -821,7 +794,6 @@
 
         /**
          * This scene's action manager
-         * @type {BABYLON.ActionManager}
         */
         public actionManager: ActionManager;
 
@@ -1278,12 +1250,13 @@
             }
 
             if (pickResult) {
+                let type = evt.type === "mousewheel" || evt.type === "DOMMouseScroll" ? PointerEventTypes.POINTERWHEEL : PointerEventTypes.POINTERMOVE;
+
                 if (this.onPointerMove) {
-                    this.onPointerMove(evt, pickResult);
+                    this.onPointerMove(evt, pickResult, type);
                 }
 
                 if (this.onPointerObservable.hasObservers()) {
-                    let type = evt.type === "mousewheel" || evt.type === "DOMMouseScroll" ? PointerEventTypes.POINTERWHEEL : PointerEventTypes.POINTERMOVE;
                     let pi = new PointerInfo(type, evt, pickResult);
                     this.onPointerObservable.notifyObservers(pi, type);
                 }
@@ -1345,12 +1318,13 @@
             }
 
             if (pickResult) {
+                let type = PointerEventTypes.POINTERDOWN;
+
                 if (this.onPointerDown) {
-                    this.onPointerDown(evt, pickResult);
+                    this.onPointerDown(evt, pickResult, type);
                 }
 
                 if (this.onPointerObservable.hasObservers()) {
-                    let type = PointerEventTypes.POINTERDOWN;
                     let pi = new PointerInfo(type, evt, pickResult);
                     this.onPointerObservable.notifyObservers(pi, type);
                 }
@@ -1406,10 +1380,7 @@
                 this._pickedDownMesh.actionManager.processTrigger(ActionManager.OnPickOutTrigger, ActionEvent.CreateNew(this._pickedDownMesh, evt));
             }
 
-            if (this.onPointerUp) {
-                this.onPointerUp(evt, pickResult);
-            }
-
+            let type = PointerEventTypes.POINTERUP;
             if (this.onPointerObservable.hasObservers()) {
                 if (!clickInfo.ignore) {
                     if (!clickInfo.hasSwiped) {
@@ -1426,10 +1397,13 @@
                     }
                 }
                 else {
-                    let type = PointerEventTypes.POINTERUP;
                     let pi = new PointerInfo(type, evt, pickResult);
                     this.onPointerObservable.notifyObservers(pi, type);
                 }
+            }
+
+            if (this.onPointerUp) {
+                this.onPointerUp(evt, pickResult, type);
             }
 
             return this;
@@ -1937,6 +1911,26 @@
                 }
             }
 
+            // Post-processes
+            if (this.activeCameras && this.activeCameras.length > 0) {
+                for (var camera of this.activeCameras) {
+                    if (!camera.isReady(true)) {
+                        return false;
+                    }
+                }
+            } else if (this.activeCamera) {
+                if (!this.activeCamera.isReady(true)) {
+                    return false;
+                }
+            }
+
+            // Particles
+            for (var particleSystem of this.particleSystems) {
+                if (!particleSystem.isReady()) {
+                    return false;
+                }
+            }
+
             return true;
         }
 
@@ -2057,25 +2051,47 @@
         }
 
         // Animations
+
         /**
          * Will start the animation sequence of a given target
-         * @param target - the target
-         * @param {number} from - from which frame should animation start
-         * @param {number} to - till which frame should animation run.
-         * @param {boolean} [loop] - should the animation loop
-         * @param {number} [speedRatio] - the speed in which to run the animation
-         * @param {Function} [onAnimationEnd] function to be executed when the animation ended.
-         * @param {BABYLON.Animatable} [animatable] an animatable object. If not provided a new one will be created from the given params.
-         * Returns {BABYLON.Animatable} the animatable object created for this animation
-         * See BABYLON.Animatable
+         * @param target defines the target
+         * @param from defines from which frame should animation start
+         * @param to defines until which frame should animation run.
+         * @param weight defines the weight to apply to the animation (1.0 by default)
+         * @param loop defines if the animation loops
+         * @param speedRatio defines the speed in which to run the animation (1.0 by default)
+         * @param onAnimationEnd defines the function to be executed when the animation ends
+         * @param animatable defines an animatable object. If not provided a new one will be created from the given params
+         * @returns the animatable object created for this animation
          */
-        public beginAnimation(target: any, from: number, to: number, loop?: boolean, speedRatio: number = 1.0, onAnimationEnd?: () => void, animatable?: Animatable): Animatable {
+        public beginWeightedAnimation(target: any, from: number, to: number, weight = 1.0, loop?: boolean, speedRatio: number = 1.0, onAnimationEnd?: () => void, animatable?: Animatable): Animatable {
+            let returnedAnimatable = this.beginAnimation(target, from, to, loop, speedRatio, onAnimationEnd, animatable, false);
+            returnedAnimatable.weight = weight;
+
+            return returnedAnimatable;
+        }
+
+        /**
+         * Will start the animation sequence of a given target
+         * @param target defines the target
+         * @param from defines from which frame should animation start
+         * @param to defines until which frame should animation run.
+         * @param loop defines if the animation loops
+         * @param speedRatio defines the speed in which to run the animation (1.0 by default)
+         * @param onAnimationEnd defines the function to be executed when the animation ends
+         * @param animatable defines an animatable object. If not provided a new one will be created from the given params
+         * @param stopCurrent defines if the current animations must be stopped first (true by default)
+         * @returns the animatable object created for this animation
+         */
+        public beginAnimation(target: any, from: number, to: number, loop?: boolean, speedRatio: number = 1.0, onAnimationEnd?: () => void, animatable?: Animatable, stopCurrent = true): Animatable {
 
             if (from > to && speedRatio > 0) {
                 speedRatio *= -1;
             }
 
-            this.stopAnimation(target);
+            if (stopCurrent) {
+                this.stopAnimation(target);
+            }
 
             if (!animatable) {
                 animatable = new Animatable(this, target, from, to, loop, speedRatio, onAnimationEnd);
@@ -2090,7 +2106,7 @@
             if (target.getAnimatables) {
                 var animatables = target.getAnimatables();
                 for (var index = 0; index < animatables.length; index++) {
-                    this.beginAnimation(animatables[index], from, to, loop, speedRatio, onAnimationEnd, animatable);
+                    this.beginAnimation(animatables[index], from, to, loop, speedRatio, onAnimationEnd, animatable, stopCurrent);
                 }
             }
 
@@ -2152,6 +2168,22 @@
             return null;
         }
 
+        /**
+         * Gets all animatables associated with a given target
+         * @param target defines the target to look animatables for
+         * @returns an array of Animatables
+         */
+        public getAllAnimatablesByTarget(target: any): Array<Animatable> {
+            let result = [];
+            for (var index = 0; index < this._activeAnimatables.length; index++) {
+                if (this._activeAnimatables[index].target === target) {
+                    result.push(this._activeAnimatables[index]);
+                }
+            }
+
+            return result;
+        }        
+
         public get animatables(): Animatable[] {
             return this._activeAnimatables;
         }
@@ -2159,13 +2191,12 @@
         /**
          * Will stop the animation of the given target
          * @param target - the target
-         * @param animationName - the name of the animation to stop (all animations will be stopped is empty)
-         * @see beginAnimation
+         * @param animationName - the name of the animation to stop (all animations will be stopped if empty)
          */
         public stopAnimation(target: any, animationName?: string): void {
-            var animatable = this.getAnimatableByTarget(target);
+            var animatables = this.getAllAnimatablesByTarget(target);
 
-            if (animatable) {
+            for (var animatable of animatables) {
                 animatable.stop(animationName);
             }
         }
@@ -2186,7 +2217,7 @@
             if (!this.animationsEnabled || this._activeAnimatables.length === 0) {
                 return;
             }
-
+           
             // Getting time
             var now = Tools.Now;
             if (!this._animationTimeLast) {
@@ -2201,6 +2232,74 @@
             for (var index = 0; index < this._activeAnimatables.length; index++) {
                 this._activeAnimatables[index]._animate(this._animationTime);
             }
+
+            // Late animation bindings
+            this._processLateAnimationBindings();
+        }
+
+        /** @ignore */
+        public _registerTargetForLateAnimationBinding(runtimeAnimation: RuntimeAnimation): void {
+            let target = runtimeAnimation.target;
+            this._registeredForLateAnimationBindings.pushNoDuplicate(target);
+
+            if (!target._lateAnimationHolders) {
+                target._lateAnimationHolders = {};               
+            }
+
+            if (!target._lateAnimationHolders[runtimeAnimation.targetPath]) {
+                target._lateAnimationHolders[runtimeAnimation.targetPath] = {
+                    totalWeight: 0,
+                    animations: []
+                }
+            }
+
+            target._lateAnimationHolders[runtimeAnimation.targetPath].animations.push(runtimeAnimation);
+            target._lateAnimationHolders[runtimeAnimation.targetPath].totalWeight += runtimeAnimation.weight;
+        }
+
+        private _processLateAnimationBindings(): void {
+            if (!this._registeredForLateAnimationBindings.length) {
+                return;
+            }
+            for (var index = 0; index < this._registeredForLateAnimationBindings.length; index++) {
+                var target = this._registeredForLateAnimationBindings.data[index];
+
+                for (var path in target._lateAnimationHolders) {
+                    var holder = target._lateAnimationHolders[path];       
+                    
+                    // Sanity check
+                    if (!holder.animations[0].originalValue.scaleAndAddToRef) {
+                        continue;
+                    }
+
+                    let normalizer = 1.0;
+                    let finalValue: any;
+
+                    if (holder.totalWeight < 1.0) {
+                        // We need to mix the original value in
+                        let originalValue = holder.animations[0].originalValue;                       
+
+                        finalValue = originalValue.scale(1.0 - holder.totalWeight)
+                    } else {
+                        // We need to normalize the weights
+                        normalizer = holder.totalWeight;
+                    }
+
+                    for (var animIndex = 0; animIndex < holder.animations.length; animIndex++) {
+                        var runtimeAnimation = holder.animations[animIndex];    
+                        if (finalValue) {
+                            runtimeAnimation.currentValue.scaleAndAddToRef(runtimeAnimation.weight / normalizer, finalValue);
+                        } else {
+                            finalValue = runtimeAnimation.currentValue.scale(runtimeAnimation.weight / normalizer);
+                        }
+                    }
+
+                    runtimeAnimation.target[path] = finalValue;
+                }
+
+                target._lateAnimationHolders = {};
+            }
+            this._registeredForLateAnimationBindings.reset();
         }
 
         // Matrix
@@ -2524,7 +2623,6 @@
          * sets the active camera of the scene using its ID
          * @param {string} id - the camera's ID
          * @return {BABYLON.Camera|null} the new active camera or null if none found.
-         * @see activeCamera
          */
         public setActiveCameraByID(id: string): Nullable<Camera> {
             var camera = this.getCameraByID(id);
@@ -2541,7 +2639,6 @@
          * sets the active camera of the scene using its name
          * @param {string} name - the camera's name
          * @return {BABYLON.Camera|null} the new active camera or null if none found.
-         * @see activeCamera
          */
         public setActiveCameraByName(name: string): Nullable<Camera> {
             var camera = this.getCameraByName(name);
@@ -3170,6 +3267,48 @@
             }
         }
 
+        /**
+         * Clear the processed materials smart array preventing retention point in material dispose.
+         */
+        public freeProcessedMaterials(): void {
+            this._processedMaterials.dispose();
+        }
+
+        /**
+         * Clear the active meshes smart array preventing retention point in mesh dispose.
+         */
+        public freeActiveMeshes(): void {
+            this._activeMeshes.dispose();
+            if (this.activeCamera && this.activeCamera._activeMeshes) {
+                this.activeCamera._activeMeshes.dispose();
+            }
+            if (this.activeCameras) {
+                for (let i = 0; i < this.activeCameras.length; i++) {
+                    let activeCamera = this.activeCameras[i];
+                    if (activeCamera && activeCamera._activeMeshes) {
+                        activeCamera._activeMeshes.dispose();
+                    }
+                }
+            }
+        }
+
+        /**
+         * Clear the info related to rendering groups preventing retention points during dispose.
+         */
+        public freeRenderingGroups(): void {
+            if (this._renderingManager) {
+                this._renderingManager.freeRenderingGroups();
+            }
+            if (this.textures) {
+                for (let i = 0; i < this.textures.length; i++) {
+                    let texture = this.textures[i];
+                    if (texture && (<RenderTargetTexture>texture).renderList) {
+                        (<RenderTargetTexture>texture).freeRenderingGroups();
+                    }
+                }
+            }
+        }
+
         public _isInIntermediateRendering(): boolean {
             return this._intermediateRendering
         }
@@ -3188,6 +3327,14 @@
          * Use this function to stop evaluating active meshes. The current list will be keep alive between frames
          */
         public freezeActiveMeshes(): Scene {
+            if (!this.activeCamera) {
+                return this;
+            }
+
+            if (!this._frustumPlanes) {
+                this.setTransformMatrix(this.activeCamera.getViewMatrix(), this.activeCamera.getProjectionMatrix());
+            }
+
             this._evaluateActiveMeshes();
             this._activeMeshesFrozen = true;
             return this;
@@ -3706,9 +3853,6 @@
                 this._gamepadManager._checkGamepadsStatus();
             }
 
-            // Before render
-            this.onBeforeRenderObservable.notifyObservers(this);
-
             // Update Cameras
             if (this.activeCameras.length > 0) {
                 for (var cameraIndex = 0; cameraIndex < this.activeCameras.length; cameraIndex++) {
@@ -3730,6 +3874,9 @@
                     }
                 }
             }
+
+            // Before render
+            this.onBeforeRenderObservable.notifyObservers(this);
 
             // Customs render targets
             this.OnBeforeRenderTargetsRenderObservable.notifyObservers(this);
@@ -4002,7 +4149,16 @@
                 throw "No camera available to enable depth renderer";
             }
             if (!this._depthRenderer[camera.id]) {
-                this._depthRenderer[camera.id] = new DepthRenderer(this, Engine.TEXTURETYPE_FLOAT, camera);
+                var textureType = 0;
+                if (this._engine.getCaps().textureHalfFloatRender) {
+                    textureType = Engine.TEXTURETYPE_HALF_FLOAT;
+                }
+                else if (this._engine.getCaps().textureFloatRender) {
+                    textureType = Engine.TEXTURETYPE_FLOAT;
+                } else {
+                    throw "Depth renderer does not support int texture type";
+                }
+                this._depthRenderer[camera.id] = new DepthRenderer(this, textureType, camera);
             }
 
             return this._depthRenderer[camera.id];
@@ -4090,6 +4246,7 @@
             this._activeSkeletons.dispose();
             this._softwareSkinnedMeshes.dispose();
             this._renderTargets.dispose();
+            this._registeredForLateAnimationBindings.dispose();
 
             if (this._boundingBoxRenderer) {
                 this._boundingBoxRenderer.dispose();

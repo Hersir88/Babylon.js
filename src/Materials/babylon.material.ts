@@ -170,12 +170,18 @@
         public reset(): void {
             for (var index = 0; index < this._keys.length; index++) {
                 var prop = this._keys[index];
+                var type = typeof (<any>this)[prop];
 
-                if (typeof ((<any>this)[prop]) === "number") {
-                    (<any>this)[prop] = 0;
-
-                } else {
-                    (<any>this)[prop] = false;
+                switch (type) {
+                    case "number":
+                        (<any>this)[prop] = 0;
+                        break;
+                    case "string":
+                        (<any>this)[prop] = "";
+                        break;
+                    default:
+                        (<any>this)[prop] = false;
+                        break;
                 }
             }
         }
@@ -189,12 +195,18 @@
             for (var index = 0; index < this._keys.length; index++) {
                 var prop = this._keys[index];
                 var value = (<any>this)[prop];
+                var type = typeof value;
 
-                if (typeof (value) === "number") {
-                    result += "#define " + prop + " " + (<any>this)[prop] + "\n";
-
-                } else if (value) {
-                    result += "#define " + prop + "\n";
+                switch (type) {
+                    case "number":
+                    case "string":
+                        result += "#define " + prop + " " + value + "\n";
+                        break;
+                    default:
+                        if (value) {
+                            result += "#define " + prop + "\n";
+                        }
+                        break;
                 }
             }
 
@@ -481,13 +493,11 @@
 
         /**
         * An event triggered when the material is disposed.
-        * @type {BABYLON.Observable}
         */
         public onDisposeObservable = new Observable<Material>();
 
         /**
          * An observer which watches for dispose events.
-         * @type {BABYLON.Observer}
          */
         private _onDisposeObserver: Nullable<Observer<Material>>;
 
@@ -503,13 +513,11 @@
 
         /**
         * An event triggered when the material is bound.
-        * @type {BABYLON.Observable}
         */
         public onBindObservable = new Observable<AbstractMesh>();
 
         /**
          * An observer which watches for bind events.
-         * @type {BABYLON.Observer}
          */
         private _onBindObserver: Nullable<Observer<AbstractMesh>>;
 
@@ -525,7 +533,6 @@
 
         /**
         * An event triggered when the material is unbound.
-        * @type {BABYLON.Observable}
         */
         public onUnBindObservable = new Observable<Material>();
 
@@ -537,6 +544,21 @@
 
         /**
          * Sets the value of the alpha mode.
+         *
+         * | Value | Type | Description |
+         * | --- | --- | --- |
+         * | 0 | ALPHA_DISABLE |   |
+         * | 1 | ALPHA_ADD |   |
+         * | 2 | ALPHA_COMBINE |   |
+         * | 3 | ALPHA_SUBTRACT |   |
+         * | 4 | ALPHA_MULTIPLY |   |
+         * | 5 | ALPHA_MAXIMIZED |   |
+         * | 6 | ALPHA_ONEONE |   |
+         * | 7 | ALPHA_PREMULTIPLIED |   |
+         * | 8 | ALPHA_PREMULTIPLIED_PORTERDUFF |   |
+         * | 9 | ALPHA_INTERPOLATE |   |
+         * | 10 | ALPHA_SCREENMODE |   |
+         *
          */
         public set alphaMode(value: number) {
             if (this._alphaMode === value) {
@@ -638,14 +660,22 @@
          */
         @serialize()
         public get wireframe(): boolean {
-            return this._fillMode === Material.WireFrameFillMode;
+            switch (this._fillMode) {
+                case Material.WireFrameFillMode:
+                case Material.LineListDrawMode:
+                case Material.LineLoopDrawMode:
+                case Material.LineStripDrawMode:
+                    return true;
+            }
+
+            return this._scene.forceWireframe;
         }
 
         /**
          * Sets the state of wireframe mode.
          */
         public set wireframe(value: boolean) {
-            this._fillMode = (value ? Material.WireFrameFillMode : Material.TriangleFillMode);
+            this.fillMode = (value ? Material.WireFrameFillMode : Material.TriangleFillMode);
         }
 
         /**
@@ -653,14 +683,20 @@
          */
         @serialize()
         public get pointsCloud(): boolean {
-            return this._fillMode === Material.PointFillMode;
+            switch (this._fillMode) {
+                case Material.PointFillMode:
+                case Material.PointListDrawMode:
+                    return true;
+            }
+
+            return this._scene.forcePointsCloud;
         }
 
         /**
          * Sets the state of point cloud mode.
          */
         public set pointsCloud(value: boolean) {
-            this._fillMode = (value ? Material.PointFillMode : Material.TriangleFillMode);
+            this.fillMode = (value ? Material.PointFillMode : Material.TriangleFillMode);
         }
 
         /**
@@ -1202,7 +1238,7 @@
                 defines.markAsTexturesDirty();
                 defines.markAsMiscDirty();
             });
-        }        
+        }
 
         /**
          * Disposes the material.
@@ -1212,6 +1248,7 @@
         public dispose(forceDisposeEffect?: boolean, forceDisposeTextures?: boolean): void {
             // Animations
             this.getScene().stopAnimation(this);
+            this.getScene().freeProcessedMaterials();
 
             // Remove from scene
             var index = this._scene.materials.indexOf(this);
@@ -1306,7 +1343,7 @@
          * @returns - Parsed material.
          */
         public static Parse(parsedMaterial: any, scene: Scene, rootUrl: string): any {
-            if (!parsedMaterial.customType) {
+            if (!parsedMaterial.customType || parsedMaterial.customType === "BABYLON.StandardMaterial" ) {
                 return StandardMaterial.Parse(parsedMaterial, scene, rootUrl);
             }
 

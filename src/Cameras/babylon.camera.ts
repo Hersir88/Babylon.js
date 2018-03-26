@@ -161,7 +161,7 @@
         public _projectionMatrix = new Matrix();
         private _doNotComputeProjectionMatrix = false;
         private _worldMatrix: Matrix;
-        public _postProcesses = new Array<PostProcess>();
+        public _postProcesses = new Array<Nullable<PostProcess>>();
         private _transformMatrix = Matrix.Zero();
 
         public _activeMeshes = new SmartArray<AbstractMesh>(256);
@@ -250,6 +250,22 @@
 
         public isActiveMesh(mesh: Mesh): boolean {
             return (this._activeMeshes.indexOf(mesh) !== -1);
+        }
+
+        /**
+         * Is this camera ready to be used/rendered
+         * @param completeCheck defines if a complete check (including post processes) has to be done (false by default)
+         * @return true if the camera is ready
+         */
+        public isReady(completeCheck = false): boolean {
+            if (completeCheck) {
+                for (var pp of this._postProcesses) {
+                    if (pp && !pp.isReady()) {
+                        return false;
+                    }
+                }
+            }
+            return super.isReady(completeCheck);
         }
 
         //Cache
@@ -352,10 +368,24 @@
             return this._rigPostProcess;
         }
 
+        /**
+         * Internal, gets the first post proces.
+         * @returns the first post process to be run on this camera.
+         */
+        public _getFirstPostProcess():Nullable<PostProcess>{
+            for(var pp in this._postProcesses){
+                if(this._postProcesses[pp] !== null){
+                    return this._postProcesses[pp];
+                }
+            }
+            return null;
+        }
+
         private _cascadePostProcessesToRigCams(): void {
             // invalidate framebuffer
-            if (this._postProcesses.length > 0) {
-                this._postProcesses[0].markTextureDirty();
+            var firstPostProcess = this._getFirstPostProcess();
+            if (firstPostProcess) {
+                firstPostProcess.markTextureDirty();
             }
 
             // glue the rigPostProcess to the end of the user postprocesses & assign to each sub-camera
@@ -387,7 +417,9 @@
 
             if (insertAt == null || insertAt < 0) {
                 this._postProcesses.push(postProcess);
-            } else {
+            } else if(this._postProcesses[insertAt] === null) {
+                this._postProcesses[insertAt] = postProcess;
+            }else{
                 this._postProcesses.splice(insertAt, 0, postProcess);
             }
             this._cascadePostProcessesToRigCams(); // also ensures framebuffer invalidated
@@ -397,7 +429,7 @@
         public detachPostProcess(postProcess: PostProcess): void {
             var idx = this._postProcesses.indexOf(postProcess);
             if (idx !== -1) {
-                this._postProcesses.splice(idx, 1);
+                this._postProcesses[idx] = null;
             }
             this._cascadePostProcessesToRigCams(); // also ensures framebuffer invalidated
         }
@@ -630,7 +662,10 @@
             } else {
                 var i = this._postProcesses.length;
                 while (--i >= 0) {
-                    this._postProcesses[i].dispose(this);
+                    var postProcess = this._postProcesses[i]
+                    if(postProcess){
+                        postProcess.dispose(this);
+                    }
                 }
             }
 

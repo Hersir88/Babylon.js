@@ -1,4 +1,3 @@
-/// <reference types="babylonjs"/>
 
 
 declare module 'babylonjs-gui' { 
@@ -217,42 +216,34 @@ declare module BABYLON.GUI {
         readonly typeName: string;
         /**
         * An event triggered when the pointer move over the control.
-        * @type {BABYLON.Observable}
         */
         onPointerMoveObservable: Observable<Vector2>;
         /**
         * An event triggered when the pointer move out of the control.
-        * @type {BABYLON.Observable}
         */
         onPointerOutObservable: Observable<Control>;
         /**
         * An event triggered when the pointer taps the control
-        * @type {BABYLON.Observable}
         */
         onPointerDownObservable: Observable<Vector2WithInfo>;
         /**
         * An event triggered when pointer up
-        * @type {BABYLON.Observable}
         */
         onPointerUpObservable: Observable<Vector2WithInfo>;
         /**
         * An event triggered when a control is clicked on
-        * @type {BABYLON.Observable}
         */
         onPointerClickObservable: Observable<Vector2WithInfo>;
         /**
         * An event triggered when pointer enters the control
-        * @type {BABYLON.Observable}
         */
         onPointerEnterObservable: Observable<Control>;
         /**
         * An event triggered when the control is marked as dirty
-        * @type {BABYLON.Observable}
         */
         onDirtyObservable: Observable<Control>;
         /**
        * An event triggered after the control is drawn
-       * @type {BABYLON.Observable}
        */
         onAfterDrawObservable: Observable<Control>;
         alpha: number;
@@ -363,6 +354,10 @@ declare module BABYLON.GUI {
         protected _children: Control[];
         protected _measureForChildren: Measure;
         protected _background: string;
+        protected _adaptWidthToChildren: boolean;
+        protected _adaptHeightToChildren: boolean;
+        adaptHeightToChildren: boolean;
+        adaptWidthToChildren: boolean;
         background: string;
         readonly children: Control[];
         constructor(name?: string | undefined);
@@ -573,12 +568,10 @@ declare module BABYLON.GUI {
         private _outlineColor;
         /**
         * An event triggered after the text is changed
-        * @type {BABYLON.Observable}
         */
         onTextChangedObservable: Observable<TextBlock>;
         /**
         * An event triggered after the text was broken up into lines
-        * @type {BABYLON.Observable}
         */
         onLinesReadyObservable: Observable<TextBlock>;
         /**

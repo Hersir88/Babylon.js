@@ -60,6 +60,7 @@ var tsConfig = {
     noUnusedLocals: true,
     strictNullChecks: true,
     strictFunctionTypes: true,
+    strict: true,
     types: [],
     lib: [
         "dom",
@@ -81,6 +82,7 @@ var externalTsConfig = {
     noImplicitThis: true,
     noUnusedLocals: true,
     strictNullChecks: true,
+    strict: true,
     types: [],
     lib: [
         "dom",
@@ -215,7 +217,9 @@ gulp.task("buildWorker", ["workers", "shaders"], function () {
         .pipe(cleants())
         .pipe(replace(extendsSearchRegex, ""))
         .pipe(replace(decorateSearchRegex, ""))
-        .pipe(addModuleExports("BABYLON"))
+        .pipe(addModuleExports("BABYLON", {
+            dependencies: config.build.dependencies
+        }))
         .pipe(uglify())
         .pipe(optimisejs())
         .pipe(gulp.dest(config.build.outputDirectory));
@@ -237,7 +241,9 @@ gulp.task("build", ["shaders"], function () {
             .pipe(cleants())
             .pipe(replace(extendsSearchRegex, ""))
             .pipe(replace(decorateSearchRegex, ""))
-            .pipe(addModuleExports("BABYLON"))
+            .pipe(addModuleExports("BABYLON", {
+                dependencies: config.build.dependencies
+            }))
             .pipe(gulp.dest(config.build.outputDirectory))
             .pipe(rename(config.build.minFilename))
             .pipe(uglify())
@@ -314,7 +320,7 @@ var buildExternalLibraries = function (settings) {
                 .pipe(replace(extendsSearchRegex, ""))
                 .pipe(replace(decorateSearchRegex, ""))
                 .pipe(replace(referenceSearchRegex, ""))
-                .pipe(addModuleExports(settings.build.moduleDeclaration, true, settings.build.extendsRoot))
+                .pipe(addModuleExports(settings.build.moduleDeclaration, { subModule: true, extendsRoot: settings.build.extendsRoot }))
                 .pipe(gulp.dest(outputDirectory))
                 .pipe(cleants())
                 .pipe(rename({ extname: ".min.js" }))
@@ -393,7 +399,7 @@ var buildExternalLibrary = function (library, settings, watch) {
         if (library.buildAsModule) {
             code = code.pipe(replace(extendsSearchRegex, ""))
                 .pipe(replace(decorateSearchRegex, ""))
-                .pipe(addModuleExports(library.moduleDeclaration, true, library.extendsRoot))
+                .pipe(addModuleExports(library.moduleDeclaration, { subModule: true, extendsRoot: library.extendsRoot }))
         }
 
         code = code.pipe(gulp.dest(outputDirectory))
@@ -431,7 +437,7 @@ var buildExternalLibrary = function (library, settings, watch) {
             let wpBuild = webpack(require(library.webpack));
             if (settings.build.outputs) {
                 let build = wpBuild
-                    .pipe(addModuleExports(library.moduleDeclaration, false, false, true, library.babylonIncluded));
+                    .pipe(addModuleExports(library.moduleDeclaration, { subModule: false, extendsRoot: false, externalUsingBabylon: true, noBabylonInit: library.babylonIncluded }));
 
                 let unminifiedOutpus = [];
                 let minifiedOutputs = [];
@@ -480,7 +486,7 @@ var buildExternalLibrary = function (library, settings, watch) {
                 sequence.push(
                     wpBuild
                         .pipe(rename(library.output.replace(".js", library.noBundleInName ? '.js' : ".bundle.js")))
-                        .pipe(addModuleExports(library.moduleDeclaration, false, library.extendsRoot, true))
+                        .pipe(addModuleExports(library.moduleDeclaration, { subModule: false, extendsRoot: library.extendsRoot, externalUsingBabylon: true }))
                         .pipe(uglify())
                         .pipe(optimisejs())
                         .pipe(gulp.dest(outputDirectory))
@@ -526,21 +532,6 @@ gulp.task("typescript-libraries", config.modules, function () {
 });
 
 /**
- * Dynamic custom configurations.
- */
-config.buildConfigurations.distributed.map(function (customConfiguration) {
-    gulp.task(customConfiguration, function (cb) {
-        config.build.currentConfig = customConfiguration;
-        config.build.outputDirectory = config.build.outputCustomConfigurationsDirectory + "/" + customConfiguration;
-        runSequence("typescript-compile", "build", cb);
-    });
-});
-
-gulp.task("typescript-customConfigurations", function (cb) {
-    runSequence(config.buildConfigurations.distributed, cb);
-});
-
-/**
  * Custom build with full path file control; used by profile.html
  */
 gulp.task("build-custom", function (cb) {
@@ -551,7 +542,7 @@ gulp.task("build-custom", function (cb) {
  * Do it all.
  */
 gulp.task("typescript-all", function (cb) {
-    runSequence("typescript", "typescript-libraries", "typescript-customConfigurations", cb);
+    runSequence("typescript", "typescript-libraries", cb);
 });
 
 /**
@@ -598,13 +589,12 @@ gulp.task("watch", ["srcTscWatch"], function () {
 
 gulp.task("intellisense", function () {
     gulp.src(config.build.intellisenseSources)
-        .pipe(concat(config.build.intellisenseFile))
-        .pipe(replace(/^\s*_.*?$/gm, ""))
-        .pipe(replace(/^\s*private .*?$/gm, ""))
-        .pipe(replace(/^\s*public _.*?$/gm, ""))
-        .pipe(replace(/^\s*protected .*?$/gm, ""))
-        .pipe(replace(/^\s*public static _.*?$/gm, ""))
-        .pipe(replace(/^\s*static _.*?$/gm, ""))
+        .pipe(concat(config.build.intellisenseFile))    
+        .pipe(replace(/^\s+_.*?;/gm, ""))
+        .pipe(replace(/^\s+_[\S\s]*?}/gm, ""))
+        .pipe(replace(/^\s*readonly _/gm, "protected readonly _"))
+        .pipe(replace(/^\s*static _/gm, "private static _"))
+        .pipe(replace(/^\s*abstract _/gm, ""))
         .pipe(gulp.dest(config.build.playgroundDirectory));
 });
 
@@ -622,7 +612,8 @@ gulp.task("deployLocalDev", function () {
 gulp.task("webserver", function () {
     var options = {
         port: 1338,
-        livereload: false
+        livereload: false,
+
     };
 
     if (commandLineOptions.public) {
