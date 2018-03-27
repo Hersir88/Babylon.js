@@ -11,9 +11,7 @@ declare module BABYLON {
         disableLighting: boolean;
         private _maxSimultaneousLights;
         maxSimultaneousLights: number;
-        private _invertNormalMapX;
         invertNormalMapX: boolean;
-        private _invertNormalMapY;
         invertNormalMapY: boolean;
         private _renderId;
         needAlphaBlending(): boolean;

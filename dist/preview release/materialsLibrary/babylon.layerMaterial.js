@@ -1,3 +1,4 @@
+"use strict";
 /// <reference path="../../../dist/preview release/babylon.d.ts"/>
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -17,7 +18,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 };
 var BABYLON;
 (function (BABYLON) {
-    var LayerMaterialDefines = (function (_super) {
+    var LayerMaterialDefines = /** @class */ (function (_super) {
         __extends(LayerMaterialDefines, _super);
         function LayerMaterialDefines() {
             var _this = _super.call(this) || this;
@@ -46,7 +47,7 @@ var BABYLON;
         }
         return LayerMaterialDefines;
     }(BABYLON.MaterialDefines));
-    var LayerMaterial = (function (_super) {
+    var LayerMaterial = /** @class */ (function (_super) {
         __extends(LayerMaterial, _super);
         function LayerMaterial() {
             var _this = _super !== null && _super.apply(this, arguments) || this;
@@ -55,8 +56,6 @@ var BABYLON;
             _this.specularPower = 64;
             _this._disableLighting = false;
             _this._maxSimultaneousLights = 4;
-            _this._invertNormalMapX = false;
-            _this._invertNormalMapY = false;
             return _this;
         }
         LayerMaterial.prototype.needAlphaBlending = function () {
@@ -73,6 +72,7 @@ var BABYLON;
         };
         // Methods   
         LayerMaterial.prototype.isReadyForSubMesh = function (mesh, subMesh, useInstances) {
+            if (useInstances === void 0) { useInstances = false; }
             if (this.isFrozen) {
                 if (this._wasPreviouslyReady && subMesh.effect) {
                     return true;
@@ -123,7 +123,7 @@ var BABYLON;
                 defines.ALPHAFROMDIFFUSE = this._shouldUseAlphaFromDiffuseTexture();
             }
             // Misc.
-            BABYLON.MaterialHelper.PrepareDefinesForMisc(mesh, scene, false, this.pointsCloud, this.fogEnabled, defines);
+            BABYLON.MaterialHelper.PrepareDefinesForMisc(mesh, scene, false, this.pointsCloud, this.fogEnabled, this._shouldTurnAlphaTestOn(mesh), defines);
             // Lights
             defines._needNormals = BABYLON.MaterialHelper.PrepareDefinesForLights(scene, mesh, defines, true, this._maxSimultaneousLights, this._disableLighting);
             // Values that need to be evaluated on every frame
@@ -192,7 +192,7 @@ var BABYLON;
                     indexParameters: { maxSimultaneousLights: this._maxSimultaneousLights - 1 }
                 }, engine), defines);
             }
-            if (!subMesh.effect.isReady()) {
+            if (!subMesh.effect || !subMesh.effect.isReady()) {
                 return false;
             }
             this._renderId = scene.getRenderId();
@@ -206,6 +206,12 @@ var BABYLON;
                 return;
             }
             var effect = subMesh.effect;
+            if (!effect) {
+                return;
+            }
+            if (!scene.activeCamera) {
+                return;
+            }
             this._activeEffect = effect;
             // Matrices        
             this.bindOnlyWorldMatrix(world);
@@ -311,51 +317,47 @@ var BABYLON;
         LayerMaterial.Parse = function (source, scene, rootUrl) {
             return BABYLON.SerializationHelper.Parse(function () { return new LayerMaterial(source.name, scene); }, source, scene, rootUrl);
         };
+        __decorate([
+            BABYLON.serializeAsTexture("diffuseTexture")
+        ], LayerMaterial.prototype, "_diffuseTexture", void 0);
+        __decorate([
+            BABYLON.expandToProperty("_markAllSubMeshesAsTexturesDirty")
+        ], LayerMaterial.prototype, "diffuseTexture", void 0);
+        __decorate([
+            BABYLON.serializeAsColor3("background")
+        ], LayerMaterial.prototype, "backgroundColor", void 0);
+        __decorate([
+            BABYLON.serializeAsTexture("bumpTexture")
+        ], LayerMaterial.prototype, "_bumpTexture", void 0);
+        __decorate([
+            BABYLON.expandToProperty("_markAllSubMeshesAsTexturesDirty"),
+            BABYLON.serializeAsColor3("specular")
+        ], LayerMaterial.prototype, "specularColor", void 0);
+        __decorate([
+            BABYLON.serialize()
+        ], LayerMaterial.prototype, "specularPower", void 0);
+        __decorate([
+            BABYLON.serialize("disableLighting")
+        ], LayerMaterial.prototype, "_disableLighting", void 0);
+        __decorate([
+            BABYLON.expandToProperty("_markAllSubMeshesAsLightsDirty")
+        ], LayerMaterial.prototype, "disableLighting", void 0);
+        __decorate([
+            BABYLON.serialize("maxSimultaneousLights")
+        ], LayerMaterial.prototype, "_maxSimultaneousLights", void 0);
+        __decorate([
+            BABYLON.expandToProperty("_markAllSubMeshesAsLightsDirty")
+        ], LayerMaterial.prototype, "maxSimultaneousLights", void 0);
+        __decorate([
+            BABYLON.serialize("invertNormalMapX"),
+            BABYLON.expandToProperty("_markAllSubMeshesAsTexturesDirty")
+        ], LayerMaterial.prototype, "invertNormalMapX", void 0);
+        __decorate([
+            BABYLON.serialize("invertNormalMapY"),
+            BABYLON.expandToProperty("_markAllSubMeshesAsTexturesDirty")
+        ], LayerMaterial.prototype, "invertNormalMapY", void 0);
         return LayerMaterial;
     }(BABYLON.PushMaterial));
-    __decorate([
-        BABYLON.serializeAsTexture("diffuseTexture")
-    ], LayerMaterial.prototype, "_diffuseTexture", void 0);
-    __decorate([
-        BABYLON.expandToProperty("_markAllSubMeshesAsTexturesDirty")
-    ], LayerMaterial.prototype, "diffuseTexture", void 0);
-    __decorate([
-        BABYLON.serializeAsColor3("background")
-    ], LayerMaterial.prototype, "backgroundColor", void 0);
-    __decorate([
-        BABYLON.serializeAsTexture("bumpTexture")
-    ], LayerMaterial.prototype, "_bumpTexture", void 0);
-    __decorate([
-        BABYLON.expandToProperty("_markAllSubMeshesAsTexturesDirty"),
-        BABYLON.serializeAsColor3("specular")
-    ], LayerMaterial.prototype, "specularColor", void 0);
-    __decorate([
-        BABYLON.serialize()
-    ], LayerMaterial.prototype, "specularPower", void 0);
-    __decorate([
-        BABYLON.serialize("disableLighting")
-    ], LayerMaterial.prototype, "_disableLighting", void 0);
-    __decorate([
-        BABYLON.expandToProperty("_markAllSubMeshesAsLightsDirty")
-    ], LayerMaterial.prototype, "disableLighting", void 0);
-    __decorate([
-        BABYLON.serialize("maxSimultaneousLights")
-    ], LayerMaterial.prototype, "_maxSimultaneousLights", void 0);
-    __decorate([
-        BABYLON.expandToProperty("_markAllSubMeshesAsLightsDirty")
-    ], LayerMaterial.prototype, "maxSimultaneousLights", void 0);
-    __decorate([
-        BABYLON.serialize("invertNormalMapX")
-    ], LayerMaterial.prototype, "_invertNormalMapX", void 0);
-    __decorate([
-        BABYLON.expandToProperty("_markAllSubMeshesAsTexturesDirty")
-    ], LayerMaterial.prototype, "invertNormalMapX", void 0);
-    __decorate([
-        BABYLON.serialize("invertNormalMapY")
-    ], LayerMaterial.prototype, "_invertNormalMapY", void 0);
-    __decorate([
-        BABYLON.expandToProperty("_markAllSubMeshesAsTexturesDirty")
-    ], LayerMaterial.prototype, "invertNormalMapY", void 0);
     BABYLON.LayerMaterial = LayerMaterial;
 })(BABYLON || (BABYLON = {}));
 

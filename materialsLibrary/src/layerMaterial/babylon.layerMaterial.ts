@@ -58,12 +58,10 @@ module BABYLON {
         public maxSimultaneousLights: number; 
 
         @serialize("invertNormalMapX")
-        private _invertNormalMapX = false;
         @expandToProperty("_markAllSubMeshesAsTexturesDirty")
         public invertNormalMapX: boolean;
 
         @serialize("invertNormalMapY")
-        private _invertNormalMapY = false;
         @expandToProperty("_markAllSubMeshesAsTexturesDirty")
         public invertNormalMapY: boolean;
 
@@ -86,7 +84,7 @@ module BABYLON {
         }
 
         // Methods   
-        public isReadyForSubMesh(mesh: AbstractMesh, subMesh: SubMesh, useInstances?: boolean): boolean {   
+        public isReadyForSubMesh(mesh: AbstractMesh, subMesh: SubMesh, useInstances: boolean = false): boolean {   
             if (this.isFrozen) {
                 if (this._wasPreviouslyReady && subMesh.effect) {
                     return true;
@@ -140,7 +138,7 @@ module BABYLON {
             }
 
             // Misc.
-            MaterialHelper.PrepareDefinesForMisc(mesh, scene, false, this.pointsCloud, this.fogEnabled, defines);
+            MaterialHelper.PrepareDefinesForMisc(mesh, scene, false, this.pointsCloud, this.fogEnabled, this._shouldTurnAlphaTestOn(mesh), defines);
 
             // Lights
             defines._needNormals = MaterialHelper.PrepareDefinesForLights(scene, mesh, defines, true, this._maxSimultaneousLights, this._disableLighting);
@@ -203,7 +201,7 @@ module BABYLON {
                                 "vClipPlane", "diffuseMatrix", "vTangentSpaceParams",
                 ];
                 var samplers = ["diffuseSampler", "bumpSampler"];
-                var uniformBuffers = [];
+                var uniformBuffers: String[] = [];
 
                 MaterialHelper.PrepareUniformsAndSamplersList(<EffectCreationOptions>{
                     uniformsNames: uniforms, 
@@ -226,7 +224,7 @@ module BABYLON {
                     }, engine), defines);
 
             }
-            if (!subMesh.effect.isReady()) {
+            if (!subMesh.effect || !subMesh.effect.isReady()) {
                 return false;
             }
 
@@ -245,6 +243,12 @@ module BABYLON {
             }
 
             var effect = subMesh.effect;
+            if (!effect) {
+                return;
+            }
+            if (!scene.activeCamera) {
+                return;
+            }
             this._activeEffect = effect;
 
             // Matrices        
